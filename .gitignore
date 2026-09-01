@@ -1,0 +1,16 @@
+# SECRETS — this repo will be public. Never commit these.
+.env
+.env.*
+!.env.example
+wallets.json
+
+# build artifacts
+node_modules/
+out/
+cache/
+broadcast/
+lib/
+
+# misc
+*.log
+.DS_Store
