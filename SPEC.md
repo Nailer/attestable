@@ -37,15 +37,24 @@ Per Creditcoin (Q8), the decoded receipt gives `status (uint8)`, `gasUsed`, `log
 
 ---
 
-## 4. Policy model — gap detection, not event counting
+## 4. Policy model — frozen by the spike, not invented during implementation
 
-**This corrects an error in the previous revision of this spec.**
+Two prior revisions of this section were wrong, in different ways. Both are recorded here so the same mistakes aren't made again during implementation.
 
-Staleness means *a gap between updates exceeded the tolerance*. It does **not** mean *too few updates occurred overall*. A naive `totalEvents >= N` policy is wrong: a feed that fires 24 times in one hour and then goes dark for 23 hours passes a "≥24 per day" test while being catastrophically stale — exactly the failure the buyer is hedging.
+**Wrong #1 — event counting.** `totalEvents >= N` over a window measures *activity*, not *staleness*. A feed that fires 24 times in one hour then goes dark for 23 hours passes a "≥24 per day" test while being catastrophically stale — precisely the failure the buyer is hedging.
 
-**Correct model — sub-window coverage.** Divide the coverage window into consecutive buckets of the tolerance duration. The policy requires proof of at least one qualifying event *inside each bucket*. Any bucket with no valid evidence by the attestation-safe deadline is a gap, and a gap is a claim.
+**Wrong #2 — naive bucketing.** "At least one event inside each fixed bucket" is *also* not equivalent to a maximum-gap guarantee, because events can sit at opposite edges of adjacent buckets. Updates at 12:59 and 13:02 fill both the 12:00 and 13:00 buckets while leaving a real gap of only 3 minutes — fine. But updates at 12:01 and 13:59 also fill both buckets while leaving a **118-minute gap**. Bucket occupancy does not bound the interval between consecutive events.
 
-This fixes three things at once: it actually measures staleness; it bounds the proof count to the number of buckets, making gas cost a tunable policy parameter rather than an unbounded liability; and it makes the Evidence Explorer legible as a timeline of buckets, filled or empty.
+**Therefore the semantics are not chosen here.** The two candidates are:
+
+- **Max-interval:** no gap between consecutive verified updates may exceed `X` seconds. Correct by construction, but may require proving *every* update in the window plus the boundary events — proof count scales with cadence, and at ~450k gas per submission that can become economically absurd for a fast feed.
+- **Bucket occupancy:** at least `M` verified updates inside each fixed sub-window. Bounds proof count to a tunable parameter, but only approximates a staleness guarantee, with the boundary weakness above.
+
+The choice depends on facts the spike measures: the real update cadence, the provable historical window, and whether multiple proofs can share a continuity proof. A feed updating hourly makes max-interval affordable over a day (~24 proofs). A feed updating every 30 seconds does not (~2,880 proofs).
+
+> **Rule: the Phase-1 spike report freezes the exact policy semantics, in mathematical terms. Phase 2 implements precisely that. No gap or bucket algorithm may be invented during implementation.**
+
+The struct below is illustrative of shape only. Its condition fields are finalized by the spike.
 
 ```solidity
 struct EvidencePolicy {
@@ -54,8 +63,9 @@ struct EvidencePolicy {
     bytes32 eventSignature;    // determined by spike
     uint64  windowStartBlock;
     uint64  windowEndBlock;
-    uint32  bucketDurationSecs;  // staleness tolerance
-    uint32  bucketCount;         // derived; bounds max proofs
+    // --- condition fields frozen by the spike report ---
+    uint32  toleranceSecs;     // max-interval bound, or bucket duration
+    uint32  requiredPerBucket; // unused if max-interval semantics are chosen
 }
 
 struct Cover {
@@ -70,14 +80,14 @@ struct Cover {
 enum CoverStatus { OPEN, ACTIVE, HEALTHY, CLAIMED }
 ```
 
-Per-bucket fill state is tracked as a bitmap or mapping keyed `(coverId, policyIndex, bucketIndex)`.
+Evidence state is tracked keyed on `(coverId, policyIndex, …)` — the final key shape follows from the semantics the spike freezes.
 
 **Settlement:**
 
 | Outcome | Condition | Buyer | Underwriter |
 |---|---|---|---|
-| `HEALTHY` | every bucket filled, all policies | — | collateral + premium |
-| `CLAIMED` | any bucket empty at deadline | collateral | premium |
+| `HEALTHY` | the frozen condition holds for every policy | — | collateral + premium |
+| `CLAIMED` | the condition fails for any policy at the deadline | collateral | premium |
 
 In = premium + collateral. Out = premium + collateral, both branches.
 
@@ -188,9 +198,9 @@ Ship this as a **visible panel in the product**, not prose in the README. Most s
 
 Fewer than the competition, each demonstrable live.
 
-1. Valid proof fills its bucket
-2. All buckets filled by deadline → `HEALTHY`, underwriter paid
-3. Empty bucket at deadline → `CLAIMED`, buyer paid
+1. Valid proof is recorded against the policy
+2. Frozen condition satisfied by deadline → `HEALTHY`, underwriter paid
+3. Frozen condition violated at deadline → `CLAIMED`, buyer paid
 4. Same evidence twice, same cover → rejected
 5. Same evidence across two covers → **both accepted** (deliberate, §4)
 6. Evidence from a non-registered contract → rejected
@@ -211,11 +221,14 @@ Tests 4, 6, 7, 8, 10 double as the live attack sequence in the demo.
 
 The previous same-feed-two-thresholds design is **rejected**: writing a policy demanding 4 updates/hour against a feed known to deliver 1 is a guaranteed loss no rational underwriter would sign, and a sharp judge will say so. It would undercut the market-fit pillar to win a demo beat.
 
-Instead the spike surveys multiple Sepolia feeds to find:
-- **A reliable feed** → coverage resolves `HEALTHY` on real evidence
-- **A feed that genuinely lapses** (less-trafficked testnet feeds do) → coverage resolves `CLAIMED` on a real gap
+The spike surveys multiple Sepolia feeds looking for a reliable one (→ `HEALTHY`) and one that genuinely lapses (→ `CLAIMED`). **A natural lapse cannot be assumed and must never be manufactured** — not controlling the source evidence is one of this project's real strengths, and faking a failure would destroy it.
 
-Both are economically coherent policies. Both settle on real data. If no genuinely-lapsing feed exists, fall back to a tight-but-plausible tolerance on a real feed and state the demonstration framing explicitly rather than pretending it's a market-realistic policy.
+If no natural lapse occurs inside the recording window, fall back to a stricter tolerance on a healthy feed, labelled honestly. The wording matters:
+
+- ✅ *"The feed remained healthy. This independently defined policy required a stricter update condition than the observed evidence satisfied."*
+- ❌ *"The Chainlink feed failed."*
+
+That distinction survives the nastiest available judge question — *"did you make the feed fail for the demo?"* — with a clean answer: **no, we don't control the source evidence and cannot influence it.**
 
 Sequence: real Chainlink contract on Etherscan (theirs, not ours) → real events → one submitted through Attestcoin, verification shown → Creditcoin evaluates → settlement tx on Blockscout → live attack sequence (replay → rejected, wrong contract → rejected, outside window → rejected).
 
@@ -262,11 +275,14 @@ Day 4 is the checkpoint. No settled cover on testnet by then → cut multi-chain
 
 1. Aggregator address behind the proxy, and whether it rotates
 2. **Which event the aggregator actually emits**, and its exact field layout
-3. Real update cadence → sets bucket duration
-4. **How far back a block can still be proven** — the usable evidence window. Policy windows get designed inside this measured constraint, never the reverse.
-5. A second feed that genuinely lapses, for the claim demo
-6. Measured end-to-end latency (source tx → settled on Creditcoin)
-7. Whether Ethereum mainnet (chain key 3) proofs work from CC3 Testnet
-8. Whether multiple proofs can share one continuity proof
-9. Creditcoin RPC + chain ID + precompiles confirmed working with Foundry (`bypass_prevrandao = true`)
-10. Real submission deadline on DoraHacks
+3. **Independently reproduced decoding** — raw receipt → raw log → `topics[]` → event signature → indexed params → decoded event, with one real worked example preserved verbatim in the spike report. The whole product asserts "*this* external event caused *this* financial decision"; that chain of reasoning must be demonstrable by hand, not taken on a library's word. The Evidence Explorer depends on it later.
+4. Real update cadence, and which timestamp is authoritative (the event's own field vs. block timestamp)
+5. **How far back a block can still be proven** — the usable evidence window. Policy windows get designed inside this measured constraint, never the reverse.
+6. A second feed that genuinely lapses, for the claim demo — **may not exist; do not assume one**
+7. Measured end-to-end latency (source tx → settled on Creditcoin)
+8. **Ethereum mainnet (chain key 3) — supported only if a full end-to-end run succeeds:** mainnet event → Attestcoin proof → Creditcoin verification → **actual Creditcoin state change**. Proof generation succeeding, an API returning 200, or the attestation dashboard showing the block do **not** qualify. Anything less means single-chain.
+9. Whether multiple proofs can share one continuity proof — directly determines whether max-interval semantics are affordable
+10. Creditcoin RPC + chain ID + precompiles confirmed working with Foundry (`bypass_prevrandao = true`)
+11. Real submission deadline on DoraHacks
+
+**The spike report freezes:** the evidence event and its decoding, the policy semantics in mathematical terms, the coverage window bounds, and the single-vs-multi-chain decision. Phase 2 implements exactly that and invents nothing.

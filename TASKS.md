@@ -52,13 +52,14 @@ Restated so you never have to repeat them, and so you can point at this list if 
 | 1.6 | Survey other Sepolia feeds for one that genuinely lapses (for the claim demo) | comparison table of feeds and gaps | no |
 | 1.7 | **Measure the provable historical window** — how far back proof generation still succeeds | success/failure at increasing block depths | no |
 | 1.8 | Select a real source transaction | hash, block, receipt status — open it on Etherscan | no |
+| 1.8A | **Independently reproduce the decoding** — raw receipt → raw log → `topics[]` → signature → indexed params → decoded event. Preserve one worked example verbatim in the spike report. | you can follow the derivation by hand against Etherscan | no |
 | 1.9 | Generate the first Attestcoin proof; time every stage | proof object + measured latency | no |
 | 1.10 | Write `SpikeVerifier.sol` — smallest contract that verifies a proof and emits `ProofAccepted` | `forge build` succeeds | no |
 | 1.11 | Deploy `SpikeVerifier` to Creditcoin testnet | contract address on Blockscout | **yes** |
 | 1.12 | **🚩 GATE — submit the proof, real state change on Creditcoin** | Creditcoin tx hash + `ProofAccepted` event on Blockscout | **yes** |
 | 1.13 | Test one invalid proof (wrong emitter or replay) → rejected | reverted tx you can inspect | **yes** |
-| 1.14 | Mainnet chain-key 3 attempt — **timeboxed**, abandon if unreliable | works or documented failure | **yes** |
-| 1.15 | Spike report → freeze policy parameters and single-vs-multi-chain decision | written report in repo | no |
+| 1.14 | Mainnet chain-key 3 — **timeboxed**. Counts as supported **only** on a full end-to-end run: mainnet event → proof → Creditcoin verification → **real state change**. Proof generation, an API response, or dashboard visibility alone do **not** qualify. | a Creditcoin tx consuming a mainnet proof, or a documented failure | **yes** |
+| 1.15 | **Spike report** → freezes the evidence event and decoding, the policy semantics *in mathematical terms*, the window bounds, and the single-vs-multi-chain call | written report committed to the repo | no |
 
 ---
 
@@ -68,7 +69,7 @@ Restated so you never have to repeat them, and so you can point at this list if 
 |---|---|---|
 | 2.1 | `AttestableASC` — proof verification, `status == 1` check, emitter + signature match | `forge test` on ASC unit tests |
 | 2.2 | `AttestableCover` — policy struct, cover creation, premium + collateral escrow | tests: cover created, funds held |
-| 2.3 | Bucket-fill logic (gap detection, per §4 of the spec) | tests: filling buckets, detecting gaps |
+| 2.3 | Implement the evidence policy **exactly as frozen in the Phase-1 spike report**. No gap or bucket algorithm may be invented here. | tests match the frozen mathematical definition |
 | 2.4 | Settlement — `HEALTHY` / `CLAIMED`, money moves correctly both ways | tests: both branches, balances verified |
 | 2.5 | Replay protection scoped `(coverId, queryId)` | test: same evidence rejected on one cover, accepted on another |
 | 2.6 | Attestation-frontier gate via `0x0FD3` | test: premature finalization rejected |
@@ -80,7 +81,7 @@ Restated so you never have to repeat them, and so you can point at this list if 
 
 | # | Task | How you verify it |
 |---|---|---|
-| 3.1 | Deploy decoder library + ASC + Cover to Creditcoin, wire them together | three addresses on Blockscout |
+| 3.1 | Deploy the required decoder/library components plus `AttestableASC` and `AttestableCover`, wired together. **The protocol's logical contract surface stays two: ASC + Cover.** A deployed library is linkage, not a third protocol contract. | addresses on Blockscout |
 | 3.2 | Create and fund a real cover on testnet | cover state readable on-chain |
 | 3.3 | Worker: source monitor (watch aggregator logs) | logs show detected events |
 | 3.4 | Worker: proof generator (attestation-frontier-driven, never a hardcoded delay) | proof produced for a detected event |
@@ -95,7 +96,7 @@ All twelve from SPEC.md §12. Tests 4, 6, 7, 8 and 10 double as the live attack 
 
 | # | Task | How you verify it |
 |---|---|---|
-| 4.1 | Happy paths (1–3): valid proof, all buckets filled, empty bucket claims | `forge test` output |
+| 4.1 | Settlement correctness (1–3): valid proof recorded, condition satisfied → `HEALTHY`, condition violated → `CLAIMED` | `forge test` output |
 | 4.2 | Evidence integrity (4–9): replay, cross-cover, wrong contract, wrong signature, out of window, failed receipt | `forge test` output |
 | 4.3 | Protocol integrity (10–12): premature finalization, wrong chain key, unauthorized settlement | `forge test` output |
 
@@ -122,7 +123,7 @@ Only after Phase 3's gate passes.
 | # | Task | How you verify it |
 |---|---|---|
 | 6.1 | Cover A on a reliable feed → resolves `HEALTHY` on real evidence | settlement tx |
-| 6.2 | Cover B on a genuinely lapsing feed → resolves `CLAIMED` on real evidence | settlement tx |
+| 6.2 | Demonstrate a genuine `CLAIMED` outcome using naturally occurring evidence. **If no natural lapse occurs in the recording window, use a clearly labelled policy-threshold demonstration and never claim the infrastructure itself failed.** Evidence is never manufactured. | settlement tx + honest on-screen framing |
 | 6.3 | Live attack sequence runs cleanly on camera | rejected txs, inspectable |
 | 6.4 | Full dry run, twice, timing the attestation waits | you watch it end to end |
 
