@@ -437,3 +437,32 @@ Checks 4, 5 and 6 each defend against a distinct way that a *cryptographically v
 | entry point | `submitEvidence(uint64,uint64,bytes,bytes32,tuple[],bytes32,bytes32[])` |
 
 Typed errors (`WrongEmitter`, `SourceTransactionFailed`, `MalformedEvent`, `AlreadyConsumed`, …) rather than string reverts, so step 1.13's rejection tests can assert *which* check fired rather than merely that something failed.
+
+---
+
+## 1.11 — Deployed to Creditcoin testnet ✅
+
+Deployed with `forge create`, avoiding `forge script` entirely — which sidesteps the unresolved `bypass_prevrandao` question from 0.5. Two deployments were required because `EvmV1Decoder` exposes `public` functions and is therefore a linked library, not inlined code.
+
+| Contract | Address | Deploy tx |
+|---|---|---|
+| `EvmV1Decoder` (library) | `0x843e8432dfE39e2010511796e7e37fC44EAb72d3` | `0xce72bdf4a37decb3e58c3ecee939f153a3cf87c03690f51bf128c5e3af5aca54` |
+| `SpikeVerifier` | `0x38817EdCa801DeeC79Dbe586Af26a1D04D180248` | `0xf503fbea5d41a1a554b706d101c559e6ef93ed5435fc6fedf8c775ee77a03e57` |
+
+Constructor arguments: `expectedEmitter = 0x719E22E3D4b690E5d96cCb40619180B5427F14AE`, `expectedChainKey = 1`.
+
+### Verified by reading the chain, not by trusting the deploy output
+
+| Call | Result |
+|---|---|
+| `eth_getCode` | 4,797 bytes present |
+| `EXPECTED_EMITTER()` | `0x719E22E3D4b690E5d96cCb40619180B5427F14AE` ✓ matches the aggregator resolved in 1.3 |
+| `EXPECTED_CHAIN_KEY()` | `1` ✓ Sepolia |
+| `ANSWER_UPDATED()` | `0x0559884f…46fc5f` ✓ matches the topic0 observed in real logs |
+| `acceptedCount()` | `0` — nothing accepted yet, as expected before the gate |
+
+**Cost:** both deployments together consumed **0.006 tCTC**, leaving 9,999.994. Gas is not a constraint on this testnet.
+
+Explorer: `https://creditcoin-testnet.blockscout.com/address/0x38817EdCa801DeeC79Dbe586Af26a1D04D180248`
+
+`acceptedCount() == 0` is the pre-condition for step 1.12. When it reads `1`, the pipeline has been proven end to end.
