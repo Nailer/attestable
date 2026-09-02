@@ -344,3 +344,53 @@ Contracts must assert `topics.length == 3` and `data.length == 32`. Those assert
 ## Open items after 1.8A
 
 Steps 1.9–1.15 remain: proof generation and timing, the minimal verifier contract, deployment, on-chain verification (the gate), invalid-proof rejection, and the mainnet attempt.
+
+---
+
+## 1.9 — First real proof generated ✅
+
+Proof requested for the selected evidence transaction. The block was already past the attestation frontier, so no waiting was required.
+
+| Stage | Elapsed |
+|---|---|
+| check attestation frontier | 0.01 s |
+| `waitUntilHeightAttested` (returned immediately — already attested) | 12.24 s |
+| `getProof` | 13.96 s |
+| **total** | **15.44 s** |
+
+Note: the 12 s in `waitUntilHeightAttested` is SDK polling overhead on an already-satisfied condition, not real waiting. For a *fresh* transaction, add the measured ~7.2 min attestation lag from 1.7.
+
+### Proof contents
+
+| Field | Value |
+|---|---|
+| chainKey | 1 |
+| headerNumber | 11,621,136 |
+| txIndex | 45 |
+| txBytes | 3,168 bytes (encoded transaction + receipt) |
+| merkle root | `0xd9c5259c69e12174e99b6e9764e0397a540745b05b400a6b3ae7944bd7c0bc3d` |
+| merkle siblings | 7 |
+| **continuity roots** | **65** |
+| served from cache | true |
+
+Returned `txHash` matches the requested hash. Full proof saved at `spike/proof-sample.json`.
+
+**Gas implication:** continuity roots dominate cost. Using the reference implementation's fallback estimate (`21000 + roots*5000 + 20000`), 65 roots implies roughly **366,000 gas** per submission. The root count grows with distance from the nearest attestation checkpoint, so evidence near a checkpoint is cheaper to prove.
+
+---
+
+## Spike item 9 — batch proofs share one continuity proof ✅
+
+`getBatchProof(txHashes[])` returns a fundamentally different shape from single proofs:
+
+```
+{ chainKey, fromHeader, toHeader, continuityProof, merkleProofs, cached, generatedAt }
+```
+
+**One `continuityProof` for the whole batch, with a map of per-transaction `merkleProofs`.**
+
+This is a decisive economic result. Proving N transactions costs one continuity proof plus N merkle proofs, rather than N continuity proofs. Since the 65 continuity roots dominate gas, batching turns the per-proof marginal cost from ~366k gas into something far smaller.
+
+**This validates the max-interval policy semantics frozen earlier.** Proving every update across a coverage window — roughly 27 for a 24-hour window — was the affordability concern that made bucket occupancy tempting. Batch proofs remove that concern, so the correct semantics are also the affordable ones.
+
+`fromHeader` and `toHeader` in the batch response indicate a block *range*, which fits an evidence window directly.
