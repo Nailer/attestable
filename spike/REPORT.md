@@ -394,3 +394,46 @@ This is a decisive economic result. Proving N transactions costs one continuity 
 **This validates the max-interval policy semantics frozen earlier.** Proving every update across a coverage window — roughly 27 for a 24-hour window — was the affordability concern that made bucket occupancy tempting. Batch proofs remove that concern, so the correct semantics are also the affordable ones.
 
 `fromHeader` and `toHeader` in the batch response indicate a block *range*, which fits an evidence window directly.
+
+---
+
+## 1.10 — SpikeVerifier contract ✅
+
+First real Solidity. Two files:
+
+- `contracts/interfaces/INativeQueryVerifier.sol` — binding to the Block Prover precompile at `0x0FD2`
+- `contracts/spike/SpikeVerifier.sol` — minimal contract proving the pipeline
+
+Deliberately throwaway. No escrow, no policy, no settlement — those are Phase 2. Its only purpose is to make step 1.12's gate meaningful: real evidence causing a real Creditcoin state change.
+
+### The six checks, in order
+
+| # | Check | Why it exists |
+|---|---|---|
+| 1 | `chainKey == EXPECTED_CHAIN_KEY` | evidence must come from the source chain we cover |
+| 2 | query not already consumed | replay protection |
+| 3 | `verifyAndEmit` returns true | the Attestcoin guarantee — inclusion + continuity |
+| 4 | `receiptStatus == 1` | **the precompile does not check success.** A reverted transaction is still genuinely included in its block |
+| 5 | `log.address_ == EXPECTED_EMITTER` | anyone can deploy a contract emitting a lookalike event and prove it honestly. The proof would be valid; the evidence worthless |
+| 6 | `topics.length == 3 && data.length == 32` | pins the parameter layout. The signature hash is identical whether or not parameters are indexed, so check 6 — not the hash — is what actually establishes shape |
+
+Checks 4, 5 and 6 each defend against a distinct way that a *cryptographically valid* proof can still carry *useless* evidence. That distinction is the core of the security model.
+
+### Compilation findings
+
+**`pure` → `view`.** Reading the `EXPECTED_EMITTER` immutable makes the decode helper `view`. Immutables are read from code, but Solidity still requires `view`.
+
+**Stack too deep.** The original `ProofAccepted` event carried `chainKey` and `emitter` alongside seven function parameters, exceeding the EVM's 16-slot stack limit. Resolved without `via_ir` by dropping both from the event — they are immutables already readable from the contract — and scoping the proof structs so they leave the stack before decoding.
+
+**Library linking required.** The compiled bytecode contains an unlinked placeholder `__$8c2f7f74ada027f7cf16d7777e2642b278$__`. `EvmV1Decoder` exposes `public` functions, so it is a deployed library, not inlined code. Step 1.11 must therefore deploy the decoder **first**, then deploy `SpikeVerifier` with `--libraries` pointing at it — matching the reference repo's documented flow.
+
+### Compiled artefacts
+
+| | |
+|---|---|
+| solc | 0.8.30, optimizer on (200 runs) |
+| creation bytecode | 5,041 bytes (limit 24,576) |
+| constructor | `(address expectedEmitter, uint64 expectedChainKey)` |
+| entry point | `submitEvidence(uint64,uint64,bytes,bytes32,tuple[],bytes32,bytes32[])` |
+
+Typed errors (`WrongEmitter`, `SourceTransactionFailed`, `MalformedEvent`, `AlreadyConsumed`, …) rather than string reverts, so step 1.13's rejection tests can assert *which* check fired rather than merely that something failed.
