@@ -250,7 +250,97 @@ With cadence measured, the §4 decision resolves:
 
 ---
 
-## Open items after 1.2–1.7
+---
 
-1. **Which timestamp is authoritative** — `AnswerUpdated.updatedAt` from event data, or the source block timestamp. Both are available; the contract must use one deterministically. Decide during 1.8A when the raw log is decoded by hand.
-2. Steps 1.8–1.15 remain: real transaction selection, by-hand decoding, proof generation, on-chain verification, invalid-proof rejection, mainnet attempt.
+## 1.8 — Selected evidence transaction ✅
+
+Chosen from within the attested range, so it is provable immediately.
+
+| Field | Value |
+|---|---|
+| tx hash | `0x797c7f9b606e8c193cda0842ef891d5cf6c7180d88c2ea975360fafec9b89f46` |
+| block number | 11,621,136 |
+| block hash | `0x3fc78584f77dfcdd219edead3cd3d55d09ce805537c8f6298374e3a087730713` |
+| block timestamp | 1788371340 — 2026-09-02T17:49:00Z |
+| log index | 29 |
+| emitter | `0x719E22E3D4b690E5d96cCb40619180B5427F14AE` (aggregator) |
+| **receipt status** | **1 (success)** |
+| tx `from` | `0xB4fC80AEc34911C5d761259E74aE8a24c2C5D995` — gas payer only, never bound to policy |
+| logs in tx | 3 |
+
+Verify independently: `https://sepolia.etherscan.io/tx/0x797c7f9b606e8c193cda0842ef891d5cf6c7180d88c2ea975360fafec9b89f46`
+
+---
+
+## 1.8A — Hand-decoded evidence ⚠️ (found a real error)
+
+### The raw log, verbatim
+
+```
+address  : 0x719E22E3D4b690E5d96cCb40619180B5427F14AE
+topics[0]: 0x0559884fd3a460db3073b7fc896cc77986f16e378210ded43186175bf646fc5f
+topics[1]: 0x00000000000000000000000000000000000000000000000000000037a9fafec0
+topics[2]: 0x0000000000000000000000000000000000000000000000000000000000008b97
+data     : 0x000000000000000000000000000000000000000000000000000000006a98618c
+```
+
+### ⚠️ The ABI layout assumed in earlier revisions of this spec was WRONG
+
+Prior revisions assumed `AnswerUpdated(int256 current, uint256 indexed roundId, uint256 updatedAt)` — one indexed parameter, two data words.
+
+The raw log shows **3 topics and 1 data word**, meaning **two** parameters are indexed. The true declaration is:
+
+```solidity
+event AnswerUpdated(int256 indexed current, uint256 indexed roundId, uint256 updatedAt)
+```
+
+**Why this is dangerous and why it was nearly missed:** a Solidity event's signature hash is computed from parameter *types* only — indexing does not affect it. So `topic0` matched perfectly against the wrong assumption. Every signature check would have passed while the decoder silently read the price out of the wrong location. This class of bug does not announce itself.
+
+This is precisely the failure mode step 1.8A was added to catch, and it caught it on the first real log.
+
+### Decoding, step by step
+
+| Step | Source | Value |
+|---|---|---|
+| signature | `topics[0]` | matches `keccak256("AnswerUpdated(int256,uint256,uint256)")` ✓ |
+| `int256 indexed current` | `topics[1]` | 239075000000 → **$2390.75** (8 decimals) |
+| `uint256 indexed roundId` | `topics[2]` | 35735 |
+| `uint256 updatedAt` | `data` word 0 | 1788371340 → 2026-09-02T17:49:00Z |
+
+**Cross-checks, both passed:**
+- Hand-decoded values match `ethers.Interface.parseLog` exactly under the corrected layout
+- Decoded price $2390.75 equals the live feed's current `latestRoundData()` answer — confirming a real price was decoded, not misaligned bytes
+
+### Timestamp question — resolved
+
+`updatedAt` (1788371340) and the block timestamp (1788371340) were **identical**, drift 0 s.
+
+**Decision: use the event's own `updatedAt`.** It sits inside the log data covered by the receipt proof, so it is verified by the same proof as everything else. The block timestamp is a header field the receipt proof does not cover, and relying on it would add a trust assumption for no gain.
+
+---
+
+## Frozen evidence definition
+
+```solidity
+// Source chain: Ethereum Sepolia, chainKey 1
+address constant AGGREGATOR = 0x719E22E3D4b690E5d96cCb40619180B5427F14AE;
+
+// keccak256("AnswerUpdated(int256,uint256,uint256)")
+bytes32 constant ANSWER_UPDATED =
+    0x0559884fd3a460db3073b7fc896cc77986f16e378210ded43186175bf646fc5f;
+
+// LAYOUT (verified against real logs, not assumed):
+//   topics[0] = ANSWER_UPDATED
+//   topics[1] = int256  indexed current    (price, 8 decimals)
+//   topics[2] = uint256 indexed roundId
+//   data[0]   = uint256 updatedAt          <- authoritative timestamp
+// Requires topics.length == 3 and data.length == 32.
+```
+
+Contracts must assert `topics.length == 3` and `data.length == 32`. Those assertions are what stop a differently-shaped lookalike event from being accepted.
+
+---
+
+## Open items after 1.8A
+
+Steps 1.9–1.15 remain: proof generation and timing, the minimal verifier contract, deployment, on-chain verification (the gate), invalid-proof rejection, and the mainnet attempt.
