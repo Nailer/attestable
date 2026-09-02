@@ -1,0 +1,24 @@
+{
+  "name": "attestable",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "description": "Parametric protection for blockchain infrastructure, settled on cryptographically verified cross-chain evidence.",
+  "scripts": {
+    "build": "forge build",
+    "test": "forge test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@gluwa/usc-contracts": "0.1.2",
+    "@gluwa/usc-sdk": "0.18.0",
+    "@openzeppelin/contracts": "5.4.0",
+    "dotenv": "^17.4.2",
+    "ethers": "^6.17.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.22.4",
+    "typescript": "^5.6.0"
+  }
+}
