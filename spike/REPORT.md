@@ -83,3 +83,174 @@ Creditcoin's guidance (Q10) is to set `bypass_prevrandao = true` in `foundry.tom
 **Options:** (a) deploy with `forge create` as the reference repo does — no dependency on the setting; (b) upgrade Foundry, if the key was introduced in a later release; (c) ask Creditcoin which forge version the guidance targets.
 
 **Recommendation:** keep the key in `foundry.toml` (harmless if inert, correct if supported), plan on `forge create` for deployment, and resolve definitively at Phase 3 rather than spending spike time on it now. The key is left in place with a comment recording that its effect is unverified.
+
+---
+
+## 0.4 — Funding ✅
+
+Deployer `0x6cf450943BcCD6526Dc8168840D4eEB453463e02` holds **10,000 tCTC**, verified by `eth_getBalance` against the live RPC. Ample for deployments, many proof submissions, and demo escrow.
+
+---
+
+## 1.2 — Creditcoin configuration ✅
+
+| Item | Spec said | Live chain says | |
+|---|---|---|---|
+| EVM chain ID | 102031 | **102031** | ✓ |
+| RPC | `rpc.cc3-testnet.creditcoin.network` | reachable | ✓ |
+| Client | — | `creditcoin3/v131.0/fc-rpc-2.0.0-dev` | — |
+
+### Precompiles — `eth_getCode` is the wrong test
+
+`eth_getCode` returns **0 bytes** for both `0x0FD2` and `0x0FD3`. This is **expected and not a fault**: these are native precompiles implemented in the node's Rust runtime, not EVM bytecode. Absence of bytecode says nothing about availability.
+
+Verified correctly by *calling* the ChainInfo precompile through the SDK, which responded with the live supported-chain set:
+
+| chainKey | name | native chainId | encoding |
+|---|---|---|---|
+| 1 | `Sepolia ethereum` | 11155111 | 1 |
+| 3 | `Ethereum` | 1 | 1 |
+
+Matches Creditcoin's Discord answer exactly. Note `chainName` returns hex-encoded bytes and needs `toUtf8String` decoding.
+
+---
+
+## 1.7 — Provable historical window ✅ (major result)
+
+`getAttestationGenesisHeight` returns **0** for both chains. Verified by probing `getContinuityBounds` at increasing depths rather than trusting the number:
+
+| Depth back from head | Block | Attested | Checkpoint span |
+|---|---|---|---|
+| 1 hour | 11,618,900 | ✅ | 100 |
+| 1 day | 11,612,000 | ✅ | 100 |
+| 1 week | 11,568,800 | ✅ | 100 |
+| 1 month | 11,403,200 | ✅ | 100 |
+| 6 months | 10,323,200 | ✅ | 1,000 |
+| 1 year | 9,027,200 | ✅ | 1,000 |
+| genesis+1 | 1 | ✅ | 1,000 |
+
+**The entire chain history is provable, back to block 1.** There is no recency constraint on the evidence window.
+
+Checkpoint spacing is 100 blocks for recent history and 1,000 for older — older evidence implies longer continuity proofs and therefore more gas, but remains valid.
+
+**Attestation lag, measured:** Sepolia 36 blocks (~7.2 min), Ethereum mainnet 38 blocks (~7.6 min). This confirms the ~8 minute figure from Creditcoin's examples empirically. **Mainnet is being attested actively**, which is promising for 1.14.
+
+### Why this matters more than expected
+
+Because all history is provable, a coverage window can be placed over a *past* period whose evidence already exists. That removes the dependency on a lapse happening during the recording window — see 1.6.
+
+---
+
+## 1.3 — The real evidence emitter ✅
+
+| | |
+|---|---|
+| Proxy | `0x694AA1769357215DE4FAC081bf1f309aDC325306` |
+| `description()` | `ETH / USD` |
+| `decimals()` | 8 |
+| **Aggregator (real emitter)** | **`0x719E22E3D4b690E5d96cCb40619180B5427F14AE`** |
+
+**The trap is confirmed empirically.** Over a 24-hour window: the aggregator emitted **81 logs**; the proxy emitted **0**. Filtering on the proxy address returns nothing. The policy must bind to the aggregator.
+
+---
+
+## 1.4 — Which event is actually emitted ✅
+
+Rather than assuming `AnswerUpdated`, all observed `topic0` values were matched against a candidate set. Over 24 hours the aggregator emitted three events, **27 of each** — they fire together on every update:
+
+| topic0 | Event | Count |
+|---|---|---|
+| `0x0559884f…46fc5f` | `AnswerUpdated(int256,uint256,uint256)` | 27 |
+| `0xf6a97944…23d451` | `NewTransmission(uint32,int192,address,int192[],bytes,bytes32)` | 27 |
+| `0x0109fc6f…c60271` | `NewRound(uint256,address,uint256)` | 27 |
+
+**`AnswerUpdated` is present and usable.** The OCR2 concern raised before the spike was legitimate — this is an OCR aggregator emitting `NewTransmission` — but it also emits the legacy `AnswerUpdated`, which is the simplest to decode (one indexed `roundId`, `int256 answer` and `uint256 updatedAt` in data).
+
+**Selected evidence event:** `AnswerUpdated(int256,uint256,uint256)`, topic0 `0x0559884fd3a460db3073b7fc896cc77986f16e378210ded43186175bf646fc5f`, emitted by `0x719E22E3D4b690E5d96cCb40619180B5427F14AE`.
+
+---
+
+## 1.5 — Real update cadence ✅
+
+Measured over ~24 hours (27 updates):
+
+| | |
+|---|---|
+| min gap | 7.0 min |
+| median gap | 60.4 min |
+| **max gap** | **61.4 min** |
+| mean gap | 55.5 min |
+
+Distribution: mostly 60–61 min with occasional early updates (7, 32, 38, 51, 53, 55, 56 min) — a **3600 s heartbeat with deviation-triggered early updates**.
+
+### ⚠️ Design consequence — the nominal heartbeat is an unsafe tolerance
+
+The heartbeat is nominally 3600 s, but real gaps reach **61.4 minutes**, because the heartbeat fires *after* 3600 s elapse plus block time. **A policy with a 60-minute tolerance would register a violation against a perfectly healthy feed.** Any tolerance must carry headroom above the observed maximum — 90 minutes is a defensible choice against a measured 61.4-minute worst case.
+
+---
+
+## 1.6 — Feed survey ✅ (and a better answer than expected)
+
+Twelve Sepolia feeds probed over ~3 days:
+
+| Feed | Updates | Median gap | Max gap |
+|---|---|---|---|
+| ETH/USD | 38 | 60m | **667m** |
+| BTC/USD | 36 | 61m | 606m |
+| LINK/USD | 41 | 61m | 712m |
+| BTC/ETH | 36 | 61m | 605m |
+| SNX/USD | 49 | 60m | 608m |
+| XAU/USD | 51 | 58m | 580m |
+| FORTH/USD | 421 | 2m | 725m |
+| USDC/USD | 3 | 1441m | 1441m |
+| DAI/USD | 2 | 1440m | 1440m |
+| GBP/USD | 2 | 1440m | 1440m |
+| EUR/USD, JPY/USD | 1 | — | too few |
+
+### The large gaps are real — verified, not assumed
+
+Many feeds showing similar ~600-minute maxima looked like it could be an artifact of silently-failed RPC chunks. Re-scanned with error suppression removed:
+
+- **0 chunks failed** — the scan was complete
+- Blocks *were* being produced throughout each gap (midpoint blocks exist with valid timestamps), so the chain was live and **the feed genuinely did not update**
+
+Three real lapses on ETH/USD:
+
+| Gap | From | To |
+|---|---|---|
+| 215.0 min | 2026-08-30 21:02 UTC (block 11,601,307) | 2026-08-31 00:37 UTC (block 11,602,342) |
+| **773.6 min** | 2026-08-31 00:37 UTC (block 11,602,342) | 2026-08-31 13:30 UTC (block 11,605,987) |
+| 667.2 min | 2026-08-31 13:30 UTC (block 11,605,987) | 2026-09-01 00:37 UTC (block 11,609,235) |
+
+### Consequence: no second feed is needed
+
+ETH/USD alone gives **both** demo outcomes on genuine, uncontrolled evidence:
+
+- **HEALTHY** — a window over a steady period, tolerance 90 min, real max gap 61.4 min
+- **CLAIMED** — a window over 2026-08-31, containing a genuine **12.9-hour** lapse
+
+Both use the same real feed, the same pipeline, and evidence nobody manufactured or influenced. The earlier worry — "what if no lapse happens during recording?" — is resolved by 1.7: all history is provable, and a real lapse already exists in it.
+
+**Framing requirement:** the CLAIMED demo settles over a *historical* window whose outcome is already determined. That must be stated plainly — it demonstrates settlement against real past evidence; production covers are written forward over unknown outcomes.
+
+---
+
+## Policy semantics — frozen
+
+With cadence measured, the §4 decision resolves:
+
+**Max-interval semantics are affordable, so correctness wins.** At ~27 updates per 24 h, a one-day window needs ~27 proofs; a 6-hour window needs ~7. Bucket occupancy — which only approximates a staleness guarantee — is not needed.
+
+> **FROZEN:** a cover is `CLAIMED` if the interval between any two consecutive verified `AnswerUpdated` events inside the policy window exceeds `toleranceSecs`, or if the interval between the window boundary and its adjacent event does. Otherwise `HEALTHY`.
+>
+> - Evidence event: `AnswerUpdated(int256,uint256,uint256)`
+> - Emitter: `0x719E22E3D4b690E5d96cCb40619180B5427F14AE` (aggregator, never the proxy)
+> - Timestamp source: **to be confirmed** — the event's own `updatedAt` field vs. block timestamp (see open items)
+> - Tolerance: must exceed the measured 61.4 min maximum; 90 min recommended
+
+---
+
+## Open items after 1.2–1.7
+
+1. **Which timestamp is authoritative** — `AnswerUpdated.updatedAt` from event data, or the source block timestamp. Both are available; the contract must use one deterministically. Decide during 1.8A when the raw log is decoded by hand.
+2. Steps 1.8–1.15 remain: real transaction selection, by-hand decoding, proof generation, on-chain verification, invalid-proof rejection, mainnet attempt.
