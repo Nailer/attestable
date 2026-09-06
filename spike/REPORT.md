@@ -466,3 +466,156 @@ Constructor arguments: `expectedEmitter = 0x719E22E3D4b690E5d96cCb40619180B5427F
 Explorer: `https://creditcoin-testnet.blockscout.com/address/0x38817EdCa801DeeC79Dbe586Af26a1D04D180248`
 
 `acceptedCount() == 0` is the pre-condition for step 1.12. When it reads `1`, the pipeline has been proven end to end.
+
+---
+
+## 1.12 — THE GATE ✅ PASSED
+
+Real Chainlink evidence caused a real state change on Creditcoin.
+
+| | |
+|---|---|
+| **Creditcoin tx** | `0x7c738788da8d94543739b7a8797f43b7c9394ad663d51693e2bba5cbd713d4a1` |
+| Creditcoin block | 5,434,308 |
+| status | 1 (success) |
+| gas used | 363,468 |
+| `acceptedCount` | **0 → 1** |
+
+`ProofAccepted` payload, decoded from the receipt:
+
+| Field | Value |
+|---|---|
+| queryId | `0xa6cb44ae68583f15b583f43a528f9e284d88e2bb6eeefe1472778473a67738dd` |
+| blockHeight | 11,621,136 (Sepolia) |
+| price | 239075000000 → **$2390.75** |
+| roundId | 35,735 |
+| updatedAt | 1788371340 → 2026-09-02T17:49:00Z |
+
+Verify independently:
+`https://creditcoin-testnet.blockscout.com/tx/0x7c738788da8d94543739b7a8797f43b7c9394ad663d51693e2bba5cbd713d4a1`
+
+**Gas note:** 363,468 actual against the reference formula's 366,000 estimate for 65 continuity roots — the formula is accurate.
+
+The full causal chain is now demonstrated end to end: a Chainlink node updated a price on Ethereum for its own reasons → Attestcoin proved that update genuinely happened → a Creditcoin contract independently verified the proof, checked the receipt succeeded, confirmed the emitter and event shape → and changed its own state as a result. **No API, no oracle operator, no trusted reporter anywhere in the path.**
+
+---
+
+## 1.13 — Five attacks, all rejected ✅
+
+| # | Attack | Rejected by | Result |
+|---|---|---|---|
+| A1 | Replay already-consumed evidence | `AlreadyConsumed(0xa6cb44ae…)` | ✅ |
+| A2 | Genuine proof relabelled as mainnet | `WrongChainKey(1, 3)` | ✅ |
+| A3 | Merkle root, one byte flipped | precompile: `Merkle proof validation failed` | ✅ |
+| A4 | Transaction payload altered | precompile: `Merkle proof validation failed` | ✅ |
+| A5 | **Valid proof, wrong aggregator** | `WrongEmitter(0x…dEaD, 0x719E…14AE)` | ✅ |
+
+`acceptedCount` remained **1** throughout — no attack incremented it.
+
+### A5 is the one that matters
+
+A perfectly genuine, cryptographically valid proof was submitted to a verifier expecting a different aggregator, and rejected. This simulates an attacker deploying a lookalike contract, emitting an identically-shaped `AnswerUpdated` with a fabricated price, and proving it *honestly*. The proof is real; the evidence is worthless.
+
+Decoy verifier: `0x2E51C2E71faB42973De514D0c1F960E221614E42`
+
+### Two methodology errors, recorded rather than hidden
+
+**First run: A3 and A4 were meaningless.** Both returned `AlreadyConsumed` instead of a proof failure. Cause: `queryId` derives from `(chainKey, blockHeight, txIndex)` only, and tampering with the merkle root or transaction bytes changes none of those — so a tampered copy of *already-consumed* evidence trips replay protection before verification is ever reached. Fixed by running tampering attacks against **fresh, unconsumed** evidence (Sepolia tx `0x255447575708a384af56749c2fad68d19901927bbdfc7af8bf64fce8e5fa4aea`).
+
+**First run: A5 crashed.** Attempted to deploy the decoy from bytecode still containing the unlinked library placeholder `__$8c2f…$__`. Fixed by deploying via `forge create --libraries`.
+
+### Finding: `verifyAndEmit` reverts, it does not return false
+
+The precompile rejects bad proofs by **reverting with a string**, not by returning `false`. Our `if (!verified) revert ProofRejected()` is therefore defensive dead code in practice — unreachable for tampered proofs.
+
+**Consequence for Phase 2:** `AttestableASC` must not rely on inspecting a boolean return to detect bad proofs. Callers that need graceful handling rather than a bubbled revert must use `try/catch` around the precompile call.
+
+---
+
+## 1.14 — Ethereum mainnet: NOT VERIFIED ❌
+
+Per our own criterion, mainnet counts as supported **only** on a full end-to-end run ending in a real Creditcoin state change. That was not achieved.
+
+**What did work:**
+- Mainnet proxy `0x5f4e…8419` resolves to aggregator `0x7d4E742018fb52E48b08BE73d041C18B21de6Fb5`
+- chainKey 3 **is actively attested** — latest attested height 25,915,700, lag 41 blocks (~8 min), consistent with Sepolia
+
+**What blocked it:** no mainnet RPC reachable from this environment permits `eth_getLogs` over a block range. The configured endpoint rejects them as archive requests requiring a paid token, and five alternative public endpoints were unreachable or refused to route. Without log queries there is no way to locate a candidate `AnswerUpdated` transaction, so no proof could be generated and nothing could be submitted.
+
+**This is an infrastructure limitation on our side, not a protocol limitation.** Attestcoin appears ready for mainnet; we could not feed it a candidate. With a paid archive RPC this would likely complete in under an hour.
+
+**VERDICT: ship single-chain.** Mainnet was first on the cut list and remains there. Multi-chain policies move to the roadmap and are described in the deck as the next protocol capability, not as a demonstrated feature. Time is better spent on Phase 2.
+
+---
+
+# 1.15 — SPIKE COMPLETE — ARCHITECTURE FROZEN
+
+Everything below is settled. **Phase 2 implements exactly this and invents nothing.**
+
+## Evidence definition
+
+```solidity
+uint64  constant CHAIN_KEY  = 1;                                          // Sepolia
+address constant AGGREGATOR = 0x719E22E3D4b690E5d96cCb40619180B5427F14AE; // NOT the proxy
+bytes32 constant ANSWER_UPDATED =
+    0x0559884fd3a460db3073b7fc896cc77986f16e378210ded43186175bf646fc5f;
+
+// Layout verified against real logs in 1.8A:
+//   topics[0] = ANSWER_UPDATED
+//   topics[1] = int256  indexed current   (price, 8 decimals)
+//   topics[2] = uint256 indexed roundId
+//   data[0]   = uint256 updatedAt         <- authoritative timestamp
+// MUST assert topics.length == 3 && data.length == 32.
+```
+
+## Policy semantics
+
+**Max-interval.** A cover is `CLAIMED` if the interval between any two consecutive verified `AnswerUpdated` events inside the window exceeds `toleranceSecs`, or if the interval from a window boundary to its adjacent event does. Otherwise `HEALTHY`.
+
+Timestamps come from the event's own `updatedAt`, never the block timestamp — `updatedAt` is inside the log data covered by the receipt proof.
+
+**Tolerance must exceed 61.4 minutes** (the measured worst-case gap on a healthy feed). **90 minutes recommended.** The nominal 3600 s heartbeat is an unsafe tolerance and would flag a healthy feed as failed.
+
+Affordable because batch proofs share one continuity proof: ~27 updates per 24 h window.
+
+## Mandatory contract checks
+
+1. `chainKey == CHAIN_KEY`
+2. evidence not already consumed for this cover — key on `(coverId, queryId)`, **never** `queryId` alone
+3. `verifyAndEmit` succeeds — note it **reverts** rather than returning false
+4. `receiptStatus == 1` — the precompile does not check success
+5. `log.address_ == AGGREGATOR`
+6. `topics.length == 3 && data.length == 32`
+
+## Operating parameters
+
+| | |
+|---|---|
+| Attestation lag | ~7.2 min (36 blocks) |
+| Provable window | entire chain history, back to block 1 |
+| Gas per single proof | ~363k (65 continuity roots) |
+| Continuity root count | grows with distance from nearest checkpoint (100-block spacing recent, 1000 older) |
+| Deployment | `forge create` + `--libraries`; never `forge script` |
+
+## Deployed spike artefacts
+
+| Contract | Address |
+|---|---|
+| `EvmV1Decoder` | `0x843e8432dfE39e2010511796e7e37fC44EAb72d3` |
+| `SpikeVerifier` | `0x38817EdCa801DeeC79Dbe586Af26a1D04D180248` |
+| Decoy verifier | `0x2E51C2E71faB42973De514D0c1F960E221614E42` |
+
+## Demo design
+
+Both outcomes on the same real feed, no manufactured evidence:
+- **HEALTHY** — window over a steady period, 90 min tolerance vs 61.4 min real max
+- **CLAIMED** — window over 2026-08-31, containing a genuine **12.9-hour** lapse
+
+The CLAIMED demo settles over a historical window whose outcome is already determined. State that plainly: it demonstrates settlement against real past evidence; production covers are written forward.
+
+## Carried into Phase 2
+
+- Single-chain only. Multi-chain is roadmap.
+- `AttestableASC` must `try/catch` the precompile if graceful handling is needed.
+- `bypass_prevrandao` remains unverified; irrelevant while using `forge create`.
+- Creditcoin RPC times out intermittently — the worker needs retry logic (already prototyped in `spike/select-evidence.ts`).

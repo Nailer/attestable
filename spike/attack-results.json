@@ -1,0 +1,35 @@
+{
+  "results": {
+    "A1": {
+      "target": "REPLAY — resubmit already-consumed evidence",
+      "expected": "AlreadyConsumed",
+      "got": "AlreadyConsumed(0xa6cb44ae68583f15b583f43a528f9e284d88e2bb6eeefe1472778473a67738dd)",
+      "pass": true
+    },
+    "A2": {
+      "target": "WRONG CHAIN KEY — genuine proof, claimed as mainnet",
+      "expected": "WrongChainKey",
+      "got": "WrongChainKey(1, 3)",
+      "pass": true
+    },
+    "A3": {
+      "target": "TAMPERED MERKLE ROOT — one byte flipped, fresh evidence",
+      "expected": "ProofRejected | Merkle proof validation failed | continuity",
+      "got": "Error(Merkle proof validation failed)",
+      "pass": true
+    },
+    "A4": {
+      "target": "TAMPERED TX BYTES — payload altered, fresh evidence",
+      "expected": "ProofRejected | Merkle proof validation failed | continuity",
+      "got": "Error(Merkle proof validation failed)",
+      "pass": true
+    },
+    "A5": {
+      "target": "WRONG EMITTER — valid proof, verifier expects another aggregator",
+      "expected": "WrongEmitter",
+      "got": "WrongEmitter(0x000000000000000000000000000000000000dEaD, 0x719E22E3D4b690E5d96cCb40619180B5427F14AE)",
+      "pass": true
+    }
+  },
+  "acceptedCount": "1"
+}
