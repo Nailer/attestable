@@ -109,12 +109,14 @@ export function CoverCard({
   settlement,
   onSelect,
   selected,
+  actions,
 }: {
   cover: Cover;
   evidence: Evidence[];
   settlement: Settlement | null;
   onSelect: () => void;
   selected: boolean;
+  actions?: React.ReactNode;
 }) {
   const [open, setOpen] = useState(selected);
   const gap = settlement ? settlement.maxGap : cover.projectedMaxGap;
@@ -181,6 +183,8 @@ export function CoverCard({
               <div className="note">posted {fmtCtc(collateral)}</div>
             </div>
           </div>
+
+          {actions}
 
           {settlement && <SettlementResult s={settlement} cover={cover} />}
           <PolicyTerms cover={cover} premium={premium} collateral={collateral} />

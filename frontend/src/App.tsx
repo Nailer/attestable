@@ -16,8 +16,10 @@ import { CoverCard } from './components/CoverCard';
 import { EvidenceExplorer } from './components/EvidenceExplorer';
 import { ProofHealthPanel } from './components/ProofHealth';
 import { TrustBoundary } from './components/TrustBoundary';
+import { ConnectBar, CreateCoverForm, CoverActions } from './components/Actions';
+import { currentState, type WalletState } from './lib/wallet';
 
-type Tab = 'covers' | 'evidence' | 'health' | 'trust';
+type Tab = 'covers' | 'write' | 'evidence' | 'health' | 'trust';
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('covers');
@@ -29,6 +31,17 @@ export default function App() {
   const [selected, setSelected] = useState<number | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [wallet, setWallet] = useState<WalletState | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+
+  useEffect(() => {
+    currentState().then(setWallet).catch(() => {});
+    const e = (window as any).ethereum;
+    if (e?.on) {
+      e.on('accountsChanged', () => currentState().then(setWallet));
+      e.on('chainChanged', () => currentState().then(setWallet));
+    }
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -55,7 +68,7 @@ export default function App() {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [reloadKey]);
 
   const settled = covers.filter((c) => c.status === 'HEALTHY' || c.status === 'CLAIMED');
   const totalVerified = Object.values(evidence).reduce((n, e) => n + e.length, 0);
@@ -97,6 +110,9 @@ export default function App() {
         <button className={`tab ${tab === 'covers' ? 'active' : ''}`} onClick={() => setTab('covers')}>
           Coverage
         </button>
+        <button className={`tab ${tab === 'write' ? 'active' : ''}`} onClick={() => setTab('write')}>
+          Write a cover
+        </button>
         <button className={`tab ${tab === 'evidence' ? 'active' : ''}`} onClick={() => setTab('evidence')}>
           Evidence Explorer
         </button>
@@ -107,6 +123,8 @@ export default function App() {
           Trust Boundary
         </button>
       </nav>
+
+      <ConnectBar wallet={wallet} onChange={setWallet} />
 
       {err && <div className="err">Could not read chain state: {err}</div>}
       {loading && <div className="loading">Reading live state from Creditcoin…</div>}
@@ -122,6 +140,9 @@ export default function App() {
               settlement={settlements[c.id] ?? null}
               selected={c.id === selected}
               onSelect={() => setSelected(c.id)}
+              actions={
+                <CoverActions cover={c} wallet={wallet} onDone={() => setReloadKey((k) => k + 1)} />
+              }
             />
           ))}
           <p className="footnote">
@@ -161,6 +182,10 @@ export default function App() {
             />
           )}
         </>
+      )}
+
+      {!loading && tab === 'write' && (
+        <CreateCoverForm onDone={() => setReloadKey((k) => k + 1)} />
       )}
 
       {!loading && tab === 'health' && health && <ProofHealthPanel health={health} />}
