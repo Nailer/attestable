@@ -40,7 +40,12 @@ contract AttestableCover is IAttestableCover, Ownable, ReentrancyGuard {
     event CoverCreated(
         uint256 indexed coverId, address indexed underwriter, uint256 collateral, uint256 premium, uint32 toleranceSecs
     );
-    event CoverPurchased(uint256 indexed coverId, address indexed buyer, uint256 premium);
+    /// @param retrospective true if the coverage window had ALREADY ENDED when
+    /// this cover was purchased. The outcome is then already determined by
+    /// history, so the premium is not a price for risk. Surfaced loudly rather
+    /// than blocked, because demonstrating settlement against real past evidence
+    /// is legitimate — silently permitting it would not be.
+    event CoverPurchased(uint256 indexed coverId, address indexed buyer, uint256 premium, bool retrospective);
     event CoverCancelled(uint256 indexed coverId);
     event EvidenceRecorded(
         uint256 indexed coverId, bytes32 indexed queryId, uint64 updatedAt, uint64 gap, uint64 maxGap, int256 price
@@ -68,6 +73,7 @@ contract AttestableCover is IAttestableCover, Ownable, ReentrancyGuard {
     error EvidenceOutOfWindow(uint64 updatedAt, uint64 windowStart, uint64 windowEnd);
     error EvidenceOutOfOrder(uint64 updatedAt, uint64 lastTimestamp);
     error WindowNotAttested(uint64 required, uint64 attested);
+    error WindowNotClosed(uint64 windowEnd, uint64 nowTs);
     error TransferFailed();
 
     modifier onlyAsc() {
@@ -124,7 +130,7 @@ contract AttestableCover is IAttestableCover, Ownable, ReentrancyGuard {
         c.buyer = msg.sender;
         c.status = CoverStatus.ACTIVE;
 
-        emit CoverPurchased(coverId, msg.sender, msg.value);
+        emit CoverPurchased(coverId, msg.sender, msg.value, block.timestamp >= c.policy.windowEnd);
     }
 
     /// @notice Underwriter reclaims collateral from a cover nobody bought.
@@ -201,6 +207,19 @@ contract AttestableCover is IAttestableCover, Ownable, ReentrancyGuard {
         Cover storage c = _requireCover(coverId);
         if (c.status != CoverStatus.ACTIVE) revert WrongStatus(CoverStatus.ACTIVE, c.status);
 
+        // SECURITY: the coverage window must actually have ended in wall-clock
+        // time. The attestation gate below is NOT sufficient on its own.
+        //
+        // THE EXPLOIT THIS BLOCKS: windowEnd (a timestamp) and windowEndBlock (a
+        // source-chain height) are independent fields. A cover created with a
+        // far-future windowEnd but an already-attested windowEndBlock would pass
+        // the attestation gate immediately. A buyer could then settle on day one,
+        // when no evidence exists yet, so tailGap spans the entire window — an
+        // instant, guaranteed CLAIMED payout of the full collateral.
+        if (block.timestamp < c.policy.windowEnd) {
+            revert WindowNotClosed(c.policy.windowEnd, uint64(block.timestamp));
+        }
+
         // Attestation-frontier gate. Without this, a cover could be settled as
         // CLAIMED merely because proofs had not yet become generatable — turning
         // a slow attestor set into a payout. We never claim to have proven
@@ -248,6 +267,14 @@ contract AttestableCover is IAttestableCover, Ownable, ReentrancyGuard {
     // ------------------------------------------------------------------
     // Views
     // ------------------------------------------------------------------
+
+    /// @notice True if this cover's window had already closed when it was bought,
+    /// meaning the outcome was already fixed by history. Consumers should display
+    /// this prominently — it is the difference between insurance and a settled bet.
+    function isRetrospective(uint256 coverId) external view returns (bool) {
+        Cover storage c = _covers[coverId];
+        return c.buyer != address(0) && block.timestamp >= c.policy.windowEnd;
+    }
 
     function getPolicy(uint256 coverId) external view returns (EvidencePolicy memory) {
         return _covers[coverId].policy;

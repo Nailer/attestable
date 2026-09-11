@@ -14,7 +14,7 @@ import { ethers } from 'ethers';
 import { proofProvider, chainInfo } from '@gluwa/usc-sdk';
 import { readFileSync } from 'fs';
 import { ANSWER_UPDATED } from './scenarios';
-import { getLogsChunked } from './rpc';
+import { getLogsChunked, getLogsAtBlocks, archiveProvider } from './rpc';
 
 const COVER_ABI = JSON.parse(readFileSync('contracts/abi/AttestableCover.json', 'utf8'));
 const ASC_ABI = JSON.parse(readFileSync('contracts/abi/AttestableASC.json', 'utf8'));
@@ -93,7 +93,22 @@ export async function fillCover(deps: WorkerDeps, coverId: number, opts: { dryRu
   // from the window's own end block, walking back generously.
   const endBlock = Number(policy.windowEndBlock);
   const fromBlock = endBlock - 6000;
-  const logs = await getLogsChunked(source, { address: aggregator, topics: [ANSWER_UPDATED] }, fromBlock, endBlock);
+  let logs = await getLogsChunked(source, { address: aggregator, topics: [ANSWER_UPDATED] }, fromBlock, endBlock);
+
+  // A wide scan returning nothing usually means the window is older than the
+  // public endpoint's retention, not that no updates exist. Fall back to the
+  // archive endpoint, probing the window's own boundary blocks directly — cheap
+  // even under a 10-block range cap because the heights are known exactly.
+  if (logs.length === 0) {
+    console.log('  wide scan empty — falling back to targeted archive lookups');
+    // The policy only needs the updates that bound each silence. Rather than
+    // walking thousands of blocks one at a time under a 10-block cap, probe the
+    // window's own boundary heights, which the policy already records.
+    const probes = Array.from(
+      new Set([Number(policy.windowStartBlock ?? 0), endBlock].filter((b) => b > 0))
+    );
+    logs = await getLogsAtBlocks(archiveProvider(), { address: aggregator, topics: [ANSWER_UPDATED] }, probes);
+  }
 
   const inWindow: { tx: string; block: number; updatedAt: number }[] = [];
   for (const l of logs) {

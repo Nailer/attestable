@@ -5,7 +5,7 @@
 // No evidence is manufactured, no service is taken down.
 import 'dotenv/config';
 import { ethers } from 'ethers';
-import { getLogsChunked } from './rpc';
+import { getLogsChunked, getLogsAtBlocks, archiveProvider } from './rpc';
 
 export const ANSWER_UPDATED = ethers.id('AnswerUpdated(int256,uint256,uint256)');
 
@@ -32,9 +32,13 @@ export async function blockTime(p: ethers.JsonRpcProvider, block: number): Promi
 /// The genuine 2026-08-31 outage: 773.6 minutes of silence between two real
 /// updates, verified in spike 1.6 with error suppression removed and blocks
 /// confirmed to be producing throughout.
-export async function outageScenario(p: ethers.JsonRpcProvider): Promise<Scenario> {
+export async function outageScenario(_p: ethers.JsonRpcProvider): Promise<Scenario> {
   const startBlock = 11_602_342;
   const endBlock = 11_605_987;
+  // These blocks are far enough back that public endpoints no longer serve
+  // them. The archive endpoint does, and because we know the exact heights we
+  // only need single-block queries — well inside its 10-block range cap.
+  const p = archiveProvider();
   return {
     name: 'outage',
     expect: 'CLAIMED',

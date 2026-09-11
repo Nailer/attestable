@@ -11,11 +11,16 @@
 import 'dotenv/config';
 import { ethers } from 'ethers';
 
+// Pin the network explicitly. Auto-detection costs a round trip on every
+// provider construction and was timing out against the archive endpoint.
+const SEPOLIA = new ethers.Network('sepolia', 11155111);
+const opts = { staticNetwork: SEPOLIA };
+
 export const scanProvider = () =>
-  new ethers.JsonRpcProvider(process.env.SOURCE_CHAIN_SCAN_RPC ?? process.env.SOURCE_CHAIN_RPC_URL!);
+  new ethers.JsonRpcProvider(process.env.SOURCE_CHAIN_SCAN_RPC ?? process.env.SOURCE_CHAIN_RPC_URL!, SEPOLIA, opts);
 
 export const archiveProvider = () =>
-  new ethers.JsonRpcProvider(process.env.SOURCE_CHAIN_ARCHIVE_RPC ?? process.env.SOURCE_CHAIN_RPC_URL!);
+  new ethers.JsonRpcProvider(process.env.SOURCE_CHAIN_ARCHIVE_RPC ?? process.env.SOURCE_CHAIN_RPC_URL!, SEPOLIA, opts);
 
 /**
  * getLogs with automatic range chunking and cap detection.

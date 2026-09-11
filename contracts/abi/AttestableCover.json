@@ -321,6 +321,25 @@
   },
   {
     "type": "function",
+    "name": "isRetrospective",
+    "inputs": [
+      {
+        "name": "coverId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "nextCoverId",
     "inputs": [],
     "outputs": [
@@ -527,6 +546,12 @@
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
+      },
+      {
+        "name": "retrospective",
+        "type": "bool",
+        "indexed": false,
+        "internalType": "bool"
       }
     ],
     "anonymous": false
@@ -769,6 +794,22 @@
       },
       {
         "name": "attested",
+        "type": "uint64",
+        "internalType": "uint64"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "WindowNotClosed",
+    "inputs": [
+      {
+        "name": "windowEnd",
+        "type": "uint64",
+        "internalType": "uint64"
+      },
+      {
+        "name": "nowTs",
         "type": "uint64",
         "internalType": "uint64"
       }

@@ -77,8 +77,8 @@ Everything below is real and independently verifiable.
 
 | Contract | Address |
 |---|---|
-| `AttestableCover` | [`0xEAb555A0875AA7723c2dc7f8f4c5dcaB55d075AD`](https://creditcoin-testnet.blockscout.com/address/0xEAb555A0875AA7723c2dc7f8f4c5dcaB55d075AD) |
-| `AttestableASC` | [`0x8A5E70513C8b627264fc1947f229D325eE21Ecce`](https://creditcoin-testnet.blockscout.com/address/0x8A5E70513C8b627264fc1947f229D325eE21Ecce) |
+| `AttestableCover` | [`0x87553eA864e4cd16357Fa3D0D27F9F4e831aDc91`](https://creditcoin-testnet.blockscout.com/address/0x87553eA864e4cd16357Fa3D0D27F9F4e831aDc91) |
+| `AttestableASC` | [`0x3b531F270eec0F15816577FC0E556eAFf00B9Fe2`](https://creditcoin-testnet.blockscout.com/address/0x3b531F270eec0F15816577FC0E556eAFf00B9Fe2) |
 | `EvmV1Decoder` (library) | [`0x843e8432dfE39e2010511796e7e37fC44EAb72d3`](https://creditcoin-testnet.blockscout.com/address/0x843e8432dfE39e2010511796e7e37fC44EAb72d3) |
 | `SpikeVerifier` (feasibility gate) | [`0x38817EdCa801DeeC79Dbe586Af26a1D04D180248`](https://creditcoin-testnet.blockscout.com/address/0x38817EdCa801DeeC79Dbe586Af26a1D04D180248) |
 
@@ -88,7 +88,19 @@ Everything below is real and independently verifiable.
 
 That transaction took a genuine Chainlink price publication from Ethereum Sepolia, verified it through Attestcoin's Block Prover precompile inside a Creditcoin contract, and changed on-chain state as a result. Gas used: 363,468. Decoded payload: **$2390.75**, round 35735, timestamped 2026-09-02 17:49 UTC.
 
-**Cover #1 is live and funded right now** — 200 CTC of underwriter collateral plus 12 CTC of buyer premium, **212 CTC held in escrow**, status `ACTIVE`.
+**Two covers have settled, with opposite outcomes, on the same contract and the same pipeline:**
+
+| | Cover #1 — HEALTHY | Cover #2 — CLAIMED |
+|---|---|---|
+| Window | 2026-09-11, 5.9 h | 2026-08-31, the real outage |
+| Worst silence proven | **61.6 min** | **773.6 min** |
+| Tolerance | 90 min | 90 min |
+| Verified proofs submitted | 7 | 2 |
+| Buyer receives | — | **200 CTC** |
+| Underwriter receives | **212 CTC** | 12 CTC |
+| Settlement | [`0x801da47a…`](https://creditcoin-testnet.blockscout.com/tx/0x801da47a335bb11898d78c5fdc49b04e8af19ba75248017c7c0ab2ab2bd253aa) | [`0xdf52e5ad…`](https://creditcoin-testnet.blockscout.com/tx/0xdf52e5adbb2ba5677225f4514981989f5730482cccc2fa11420c0ec5613f28cd) |
+
+Note the healthy cover's worst gap: **61.6 minutes**. The feed's nominal heartbeat is 60. A policy written to the specification would have paid a claim against a perfectly functioning feed — which is why the tolerance is 90.
 
 ---
 
@@ -395,7 +407,7 @@ Tested against the **live** precompile on Creditcoin, not in simulation. Five at
 | Alter the proven transaction payload | precompile: `Merkle proof validation failed` |
 | **Valid proof, wrong aggregator** | `WrongEmitter` |
 
-Plus 30 local tests covering both settlement branches, the real 12.9-hour outage replayed, the measured 61.4-minute worst case correctly *not* claiming, per-cover replay, cross-cover evidence reuse, ordering, window bounds, the frontier gate, double settlement, and a 256-run fuzz on escrow conservation.
+Plus 48 local tests covering both settlement branches, the real 12.9-hour outage replayed, the measured 61.4-minute worst case correctly *not* claiming, per-cover replay, cross-cover evidence reuse, ordering, window bounds, the frontier gate, double settlement, and a 256-run fuzz on escrow conservation.
 
 ### A design decision worth calling out
 

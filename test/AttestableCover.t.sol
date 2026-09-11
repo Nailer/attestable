@@ -145,6 +145,7 @@ contract AttestableCoverTest is Test {
         // Hourly updates across the whole window: max gap 3600s < 5400s tolerance.
         _feed(id, 3600, 3600, 24);
 
+        vm.warp(WINDOW_END + 1); // window must actually have closed
         chainInfo.setFrontier(WINDOW_END_BLOCK);
         uint256 uBefore = underwriter.balance;
         uint256 bBefore = buyer.balance;
@@ -163,6 +164,7 @@ contract AttestableCoverTest is Test {
         // Updates stop 6 hours in, leaving an 18-hour silence to the window end.
         _feed(id, 3600, 3600, 6);
 
+        vm.warp(WINDOW_END + 1); // window must actually have closed
         chainInfo.setFrontier(WINDOW_END_BLOCK);
         uint256 uBefore = underwriter.balance;
         uint256 bBefore = buyer.balance;
@@ -188,6 +190,7 @@ contract AttestableCoverTest is Test {
 
         assertGt(cover.getCover(id).maxGap, TOLERANCE);
 
+        vm.warp(WINDOW_END + 1); // window must actually have closed
         chainInfo.setFrontier(WINDOW_END_BLOCK);
         cover.settle(id);
         assertEq(uint8(cover.getCover(id).status), uint8(CoverStatus.CLAIMED));
@@ -209,6 +212,7 @@ contract AttestableCoverTest is Test {
 
     function test_Settle_NoEvidenceAtAll_Claims() public {
         uint256 id = _openAndBuy();
+        vm.warp(WINDOW_END + 1); // window must actually have closed
         chainInfo.setFrontier(WINDOW_END_BLOCK);
         cover.settle(id);
         assertEq(uint8(cover.getCover(id).status), uint8(CoverStatus.CLAIMED));
@@ -279,6 +283,7 @@ contract AttestableCoverTest is Test {
     /// supplied the evidence — otherwise attestor lag alone would trigger payouts.
     function test_Settle_BlockedUntilAttestationFrontierPasses() public {
         uint256 id = _openAndBuy();
+        vm.warp(WINDOW_END + 1);
         chainInfo.setFrontier(WINDOW_END_BLOCK - 1);
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -287,12 +292,14 @@ contract AttestableCoverTest is Test {
         );
         cover.settle(id);
 
+        vm.warp(WINDOW_END + 1); // window must actually have closed
         chainInfo.setFrontier(WINDOW_END_BLOCK);
         cover.settle(id); // now permitted
     }
 
     function test_Settle_CannotSettleTwice() public {
         uint256 id = _openAndBuy();
+        vm.warp(WINDOW_END + 1); // window must actually have closed
         chainInfo.setFrontier(WINDOW_END_BLOCK);
         cover.settle(id);
         vm.expectRevert(
@@ -309,6 +316,7 @@ contract AttestableCoverTest is Test {
         uint256 uBefore = underwriter.balance;
         uint256 bBefore = buyer.balance;
 
+        vm.warp(WINDOW_END + 1); // window must actually have closed
         chainInfo.setFrontier(WINDOW_END_BLOCK);
         cover.settle(id);
 
