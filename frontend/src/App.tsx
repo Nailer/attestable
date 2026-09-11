@@ -52,20 +52,27 @@ export default function App() {
         setHealth(h);
         setSelected(cs.length ? cs[cs.length - 1].id : null);
 
-        const ev: Record<number, Evidence[]> = {};
-        const st: Record<number, Settlement | null> = {};
-        const pv: Record<number, number[]> = {};
-        for (const c of cs) {
-          ev[c.id] = await getEvidence(c.id);
-          st[c.id] = await getSettlement(c.id);
-          pv[c.id] = await getProvisional(c.policy, ev[c.id]);
-        }
-        setEvidence(ev);
-        setSettlements(st);
-        setProvisional(pv);
+        // Show the covers immediately. Evidence needs several log queries per
+        // cover, and blocking the whole page on them left a spinner up for
+        // 15+ seconds — long enough that a visitor assumes it is broken.
+        setLoading(false);
+
+        // Then fill in evidence per cover, in parallel, updating as each lands.
+        await Promise.all(
+          cs.map(async (c) => {
+            try {
+              const [e, st] = await Promise.all([getEvidence(c.id), getSettlement(c.id)]);
+              setEvidence((prev) => ({ ...prev, [c.id]: e }));
+              setSettlements((prev) => ({ ...prev, [c.id]: st }));
+              const pv = await getProvisional(c.policy, e);
+              setProvisional((prev) => ({ ...prev, [c.id]: pv }));
+            } catch {
+              // one cover failing must not blank the rest of the page
+            }
+          })
+        );
       } catch (e: any) {
         setErr(e?.message ?? String(e));
-      } finally {
         setLoading(false);
       }
     })();
