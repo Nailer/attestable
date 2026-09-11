@@ -18,6 +18,7 @@ import { ProofHealthPanel } from './components/ProofHealth';
 import { TrustBoundary } from './components/TrustBoundary';
 import { ConnectBar, CreateCoverForm, CoverActions } from './components/Actions';
 import { currentState, type WalletState } from './lib/wallet';
+import { SubmitEvidencePanel } from './components/SubmitEvidence';
 
 type Tab = 'covers' | 'write' | 'evidence' | 'health' | 'trust';
 
@@ -142,6 +143,13 @@ export default function App() {
               onSelect={() => setSelected(c.id)}
               actions={
                 <CoverActions cover={c} wallet={wallet} onDone={() => setReloadKey((k) => k + 1)} />
+              }
+              evidencePanel={
+                <SubmitEvidencePanel
+                  cover={c}
+                  wallet={wallet}
+                  onDone={() => setReloadKey((k) => k + 1)}
+                />
               }
             />
           ))}

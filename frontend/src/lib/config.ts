@@ -1,6 +1,7 @@
 // Generated from .env at build time — public addresses only, never keys.
 export const CONFIG = {
   creditcoinRpc: 'https://rpc.cc3-testnet.creditcoin.network',
+  proofBuilderUrl: 'https://prover.cc3-testnet.creditcoin.network',
   sepoliaRpc: 'https://ethereum-sepolia-rpc.publicnode.com',
   coverAddress: '0x87553eA864e4cd16357Fa3D0D27F9F4e831aDc91',
   ascAddress: '0x3b531F270eec0F15816577FC0E556eAFf00B9Fe2',
