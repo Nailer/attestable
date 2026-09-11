@@ -5,6 +5,7 @@
 // No evidence is manufactured, no service is taken down.
 import 'dotenv/config';
 import { ethers } from 'ethers';
+import { getLogsChunked } from './rpc';
 
 export const ANSWER_UPDATED = ethers.id('AnswerUpdated(int256,uint256,uint256)');
 
@@ -55,7 +56,7 @@ export async function healthyScenario(
   // Search recent attested history for a run of updates with no gap over tolerance.
   const to = attestedHead - 50;
   const from = to - 2000;
-  const logs = await p.getLogs({ address: aggregator, topics: [ANSWER_UPDATED], fromBlock: from, toBlock: to });
+  const logs = await getLogsChunked(p, { address: aggregator, topics: [ANSWER_UPDATED] }, from, to, { quiet: true });
   if (logs.length < 3) throw new Error('not enough recent updates to build a healthy window');
 
   const stamps: { block: number; ts: number }[] = [];

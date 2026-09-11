@@ -14,6 +14,7 @@ import { ethers } from 'ethers';
 import { proofProvider, chainInfo } from '@gluwa/usc-sdk';
 import { readFileSync } from 'fs';
 import { ANSWER_UPDATED } from './scenarios';
+import { getLogsChunked } from './rpc';
 
 const COVER_ABI = JSON.parse(readFileSync('contracts/abi/AttestableCover.json', 'utf8'));
 const ASC_ABI = JSON.parse(readFileSync('contracts/abi/AttestableASC.json', 'utf8'));
@@ -25,10 +26,18 @@ export interface WorkerDeps {
 }
 
 function gasFor(rootCount: number): bigint {
-  // Reference formula: 21k base + ~5k per continuity root + ~20k overhead.
-  // Tripled for headroom — the ASC also decodes a 3kB receipt and calls into
-  // the Cover contract, well beyond what the reference minter did.
-  return BigInt((21000 + rootCount * 5000 + 20000) * 3);
+  // The reference formula (21k + 5k/root + 20k) models the precompile call only.
+  // It badly underestimates OUR cost at low root counts, because AttestableASC
+  // additionally decodes a ~3kB receipt, searches its logs, and calls into
+  // AttestableCover — work the reference minter never did.
+  //
+  // Measured: submissions with 30-98 roots consumed 461k-492k gas, i.e. cost is
+  // dominated by a large FIXED component, not by root count. Two submissions
+  // with 7 and 15 roots ran out of gas under the old formula (228k and 348k).
+  //
+  // So: a 600k floor for the fixed work, plus per-root cost on top.
+  const FIXED_FLOOR = 600_000;
+  return BigInt(Math.max(FIXED_FLOOR, 200_000 + rootCount * 6_000) + 200_000);
 }
 
 /** Wait until Attestcoin can prove this height, then build the proof. */
@@ -39,9 +48,21 @@ async function proofFor(
   block: number
 ) {
   await builder.waitUntilHeightAttested(chainKey, block, 15_000, 1_200_000);
-  const r = await builder.getProof(txHash);
-  if (!r.success || !r.data) throw new Error(`proof failed for ${txHash}: ${(r as any).error}`);
-  return r.data;
+  // The Proof Builder occasionally times out. Transient — retry rather than
+  // abandoning a whole cover mid-fill.
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= 4; attempt++) {
+    try {
+      const r = await builder.getProof(txHash);
+      if (r.success && r.data) return r.data;
+      lastErr = (r as any).error;
+    } catch (e) {
+      lastErr = e;
+    }
+    console.log(`     (proof attempt ${attempt}/4 failed, retrying in ${attempt * 3}s)`);
+    await new Promise((res) => setTimeout(res, attempt * 3000));
+  }
+  throw new Error(`proof failed for ${txHash}: ${lastErr}`);
 }
 
 /**
@@ -72,12 +93,7 @@ export async function fillCover(deps: WorkerDeps, coverId: number, opts: { dryRu
   // from the window's own end block, walking back generously.
   const endBlock = Number(policy.windowEndBlock);
   const fromBlock = endBlock - 6000;
-  const logs = await source.getLogs({
-    address: aggregator,
-    topics: [ANSWER_UPDATED],
-    fromBlock,
-    toBlock: endBlock,
-  });
+  const logs = await getLogsChunked(source, { address: aggregator, topics: [ANSWER_UPDATED] }, fromBlock, endBlock);
 
   const inWindow: { tx: string; block: number; updatedAt: number }[] = [];
   for (const l of logs) {
@@ -87,6 +103,16 @@ export async function fillCover(deps: WorkerDeps, coverId: number, opts: { dryRu
     }
   }
   inWindow.sort((a, b) => a.updatedAt - b.updatedAt);
+
+  // Resuming: the Cover contract enforces strictly increasing timestamps, so
+  // anything at or before lastTimestamp is already recorded. Re-submitting it
+  // would just burn gas on a guaranteed revert.
+  const existing = await cover.getCover(coverId);
+  const lastTs = Number(existing.lastTimestamp);
+  const pending = lastTs === 0 ? inWindow : inWindow.filter((e) => e.updatedAt > lastTs);
+  if (lastTs !== 0) {
+    console.log(`  already recorded up to ts ${lastTs} — ${inWindow.length - pending.length} skipped`);
+  }
 
   console.log(`  found ${inWindow.length} qualifying update(s) inside the window`);
   for (const e of inWindow) {
@@ -101,7 +127,7 @@ export async function fillCover(deps: WorkerDeps, coverId: number, opts: { dryRu
   const builder = new proofProvider.service.ProofBuilder(chainKey, process.env.PROOF_BUILDER_URL!);
   let submitted = 0;
 
-  for (const e of inWindow) {
+  for (const e of pending) {
     console.log(`\n  -> proving block ${e.block} (ts ${e.updatedAt})`);
     const p = await proofFor(builder, e.tx, chainKey, e.block);
     console.log(`     proof: ${p.merkleProof.siblings.length} siblings, ${p.continuityProof.roots.length} continuity roots`);
@@ -142,7 +168,7 @@ if (require.main === module) {
     process.exit(1);
   }
   const cc = new ethers.JsonRpcProvider(process.env.CREDITCOIN_RPC_URL!);
-  const source = new ethers.JsonRpcProvider(process.env.SOURCE_CHAIN_RPC_URL!);
+  const source = new ethers.JsonRpcProvider(process.env.SOURCE_CHAIN_SCAN_RPC ?? process.env.SOURCE_CHAIN_RPC_URL!);
   const wallet = new ethers.Wallet(process.env.DEPLOYER_PRIVATE_KEY!, cc);
 
   fillCover({ cc, source, wallet }, coverId, { dryRun: process.argv.includes('--dry-run') })

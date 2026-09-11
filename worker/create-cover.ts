@@ -17,7 +17,7 @@ async function main() {
   const which = process.argv[2] ?? 'outage';
 
   const cc = new ethers.JsonRpcProvider(process.env.CREDITCOIN_RPC_URL!);
-  const source = new ethers.JsonRpcProvider(process.env.SOURCE_CHAIN_RPC_URL!);
+  const source = new ethers.JsonRpcProvider(process.env.SOURCE_CHAIN_SCAN_RPC ?? process.env.SOURCE_CHAIN_RPC_URL!);
   const info = new chainInfo.PrecompileChainInfoProvider(cc);
 
   const underwriter = new ethers.Wallet(process.env.UNDERWRITER_PRIVATE_KEY!, cc);

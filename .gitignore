@@ -3,16 +3,19 @@
 .env.*
 !.env.example
 wallets.json
-
 # build artifacts
 node_modules/
 out/
 cache/
 broadcast/
-lib/
-
 # misc
 *.log
 .DS_Store
+frontend/node_modules/
+frontend/dist/
 
-lib/
+# Foundry dependencies (root only — NOT frontend/src/lib)
+/lib/
+frontend/node_modules/
+frontend/dist/
+*.tsbuildinfo
