@@ -13,6 +13,7 @@ import { ethers } from 'ethers';
 import { CONFIG } from './config';
 import ascAbi from './asc.abi.json';
 import type { Policy } from './chain';
+import { sepoliaEndpoint, gasMargin } from './settings';
 
 export interface ProofResponse {
   chainKey: number;
@@ -58,7 +59,7 @@ export async function findCandidates(
   policy: Policy,
   onProgress?: (msg: string) => void
 ): Promise<Candidate[]> {
-  const provider = new ethers.JsonRpcProvider(CONFIG.sepoliaRpc);
+  const provider = new ethers.JsonRpcProvider(sepoliaEndpoint());
   const end = policy.windowEndBlock;
   const start = Math.max(0, end - 6000);
 
@@ -110,7 +111,8 @@ export async function findCandidates(
  * Two submissions previously ran out of gas without it.
  */
 function gasFor(rootCount: number): bigint {
-  return BigInt(Math.max(600_000, 200_000 + rootCount * 6_000) + 200_000);
+  const base = Math.max(600_000, 200_000 + rootCount * 6_000) + 200_000;
+  return BigInt(Math.round(base * (1 + gasMargin() / 100)));
 }
 
 export interface SubmitProgress {

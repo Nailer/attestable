@@ -1,6 +1,7 @@
 import type { Cover, Evidence } from '../lib/chain';
 import { CONFIG } from '../lib/config';
 import { fmtMins, fmtPrice, fmtTime, short } from '../lib/chain';
+import { useSettings } from '../lib/settings';
 
 /**
  * The Evidence Explorer.
@@ -106,6 +107,8 @@ export function EvidenceExplorer({
   evidence: Evidence[];
   provisional: number[];
 }) {
+  const [settings] = useSettings();
+  const shown = settings.showProvisional ? provisional : [];
   return (
     <div className="panel">
       <h2>Evidence Explorer — Cover #{cover.id}</h2>
@@ -113,7 +116,7 @@ export function EvidenceExplorer({
         Every hop links to a public explorer. Verify any of it independently.
       </p>
 
-      {evidence.length === 0 && provisional.length === 0 && (
+      {evidence.length === 0 && shown.length === 0 && (
         <p style={{ color: 'var(--muted)' }}>
           No evidence recorded. If the window has closed, the entire window counts as one unbroken
           silence — which is exactly why this cover would settle as a claim.
@@ -124,7 +127,7 @@ export function EvidenceExplorer({
         <EvidenceChain key={e.queryId + e.creditcoinTx} e={e} policy={cover.policy} />
       ))}
 
-      {provisional.length > 0 && (
+      {shown.length > 0 && (
         <>
           <h3 style={{ fontSize: 13, marginTop: 24, marginBottom: 6 }}>
             Observed off-chain, not yet verified
@@ -142,7 +145,7 @@ export function EvidenceExplorer({
               </tr>
             </thead>
             <tbody>
-              {provisional.map((ts) => (
+              {shown.map((ts) => (
                 <tr key={ts} className="provisional-row">
                   <td>
                     <span className="badge provisional">PROVISIONAL</span>

@@ -19,8 +19,10 @@ import { TrustBoundary } from './components/TrustBoundary';
 import { ConnectBar, CreateCoverForm, CoverActions } from './components/Actions';
 import { currentState, type WalletState } from './lib/wallet';
 import { SubmitEvidencePanel } from './components/SubmitEvidence';
+import { SettingsPanel } from './components/Settings';
+import { useSettings } from './lib/settings';
 
-type Tab = 'covers' | 'write' | 'evidence' | 'health' | 'trust';
+type Tab = 'covers' | 'write' | 'evidence' | 'health' | 'trust' | 'settings';
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('covers');
@@ -34,6 +36,15 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [wallet, setWallet] = useState<WalletState | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const [settings] = useSettings();
+
+  // Auto-refresh, when enabled. Each tick costs several RPC calls per cover,
+  // which is why it is off by default.
+  useEffect(() => {
+    if (!settings.refreshSecs) return;
+    const t = setInterval(() => setReloadKey((k) => k + 1), settings.refreshSecs * 1000);
+    return () => clearInterval(t);
+  }, [settings.refreshSecs]);
 
   useEffect(() => {
     currentState().then(setWallet).catch(() => {});
@@ -130,6 +141,9 @@ export default function App() {
         <button className={`tab ${tab === 'trust' ? 'active' : ''}`} onClick={() => setTab('trust')}>
           Trust Boundary
         </button>
+        <button className={`tab ${tab === 'settings' ? 'active' : ''}`} onClick={() => setTab('settings')}>
+          Settings
+        </button>
       </nav>
 
       <ConnectBar wallet={wallet} onChange={setWallet} />
@@ -205,6 +219,7 @@ export default function App() {
 
       {!loading && tab === 'health' && health && <ProofHealthPanel health={health} />}
       {!loading && tab === 'trust' && <TrustBoundary />}
+      {tab === 'settings' && <SettingsPanel />}
     </div>
   );
 }

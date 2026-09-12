@@ -3,11 +3,14 @@
 // never presents off-chain observation as though it were verified.
 import { ethers } from 'ethers';
 import { CONFIG } from './config';
+import { sepoliaEndpoint, formatTimestamp } from './settings';
 import coverAbi from './cover.abi.json';
 import ascAbi from './asc.abi.json';
 
 export const cc = new ethers.JsonRpcProvider(CONFIG.creditcoinRpc);
-export const sepolia = new ethers.JsonRpcProvider(CONFIG.sepoliaRpc);
+/** Rebuilt per call so an endpoint change in settings takes effect immediately. */
+export const sepoliaProvider = () => new ethers.JsonRpcProvider(sepoliaEndpoint());
+export const sepolia = sepoliaProvider();
 
 export const coverContract = new ethers.Contract(CONFIG.coverAddress, coverAbi, cc);
 export const ascContract = new ethers.Contract(CONFIG.ascAddress, ascAbi, cc);
@@ -215,10 +218,11 @@ const AGGREGATOR_ABI = [
 
 export async function getProofHealth(): Promise<ProofHealth> {
   const chainInfo = new ethers.Contract(CONFIG.chainInfoPrecompile, CHAIN_INFO_ABI, cc);
-  const agg = new ethers.Contract(CONFIG.aggregator, AGGREGATOR_ABI, sepolia);
+  const agg = new ethers.Contract(CONFIG.aggregator, AGGREGATOR_ABI, sepoliaProvider());
 
+  const sep = sepoliaProvider();
   const [sepoliaHead, creditcoinHead, attested, escrow] = await Promise.all([
-    sepolia.getBlockNumber(),
+    sep.getBlockNumber(),
     cc.getBlockNumber(),
     chainInfo.get_latest_attestation_height_and_hash(CONFIG.sepoliaChainKey),
     cc.getBalance(CONFIG.coverAddress),
@@ -255,7 +259,7 @@ export async function getProofHealth(): Promise<ProofHealth> {
 export async function getProvisional(policy: Policy, verified: Evidence[]): Promise<number[]> {
   const known = new Set(verified.map((e) => e.updatedAt));
   try {
-    const logs = await sepolia.getLogs({
+    const logs = await sepoliaProvider().getLogs({
       address: policy.sourceContract,
       topics: [policy.eventSignature],
       fromBlock: policy.windowEndBlock - 1500,
@@ -273,6 +277,6 @@ export async function getProvisional(policy: Policy, verified: Evidence[]): Prom
 // --- formatting helpers -------------------------------------------------
 export const fmtCtc = (v: bigint) => `${Number(ethers.formatEther(v)).toLocaleString()} CTC`;
 export const fmtMins = (s: number) => `${(s / 60).toFixed(1)} min`;
-export const fmtTime = (ts: number) => new Date(ts * 1000).toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
+export const fmtTime = (ts: number) => formatTimestamp(ts);
 export const fmtPrice = (p: bigint) => `$${(Number(p) / 1e8).toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
 export const short = (s: string, n = 6) => `${s.slice(0, n + 2)}…${s.slice(-4)}`;

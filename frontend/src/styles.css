@@ -1,4 +1,6 @@
-:root {
+/* Dark is the default. A stored choice stamps data-theme on the root; with no
+   choice ("system"), the media query below follows the OS. */
+:root, :root[data-theme="dark"] {
   --bg: #0b0e14;
   --surface: #131823;
   --surface-2: #1a2030;
@@ -15,6 +17,44 @@
   --red-dim: #4a1a1a;
   --purple: #b47cff;
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+}
+
+:root[data-theme="light"] {
+  --bg: #f7f8fa;
+  --surface: #ffffff;
+  --surface-2: #f0f2f6;
+  --border: #dde1e8;
+  --text: #131722;
+  --muted: #5a6478;
+  --dim: #8892a4;
+  --accent: #0a66d0;
+  --green: #12833f;
+  --green-dim: #dcf3e4;
+  --amber: #a35a00;
+  --amber-dim: #fbeeda;
+  --red: #c02626;
+  --red-dim: #fbe3e3;
+  --purple: #6b34c4;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    --bg: #f7f8fa;
+    --surface: #ffffff;
+    --surface-2: #f0f2f6;
+    --border: #dde1e8;
+    --text: #131722;
+    --muted: #5a6478;
+    --dim: #8892a4;
+    --accent: #0a66d0;
+    --green: #12833f;
+    --green-dim: #dcf3e4;
+    --amber: #a35a00;
+    --amber-dim: #fbeeda;
+    --red: #c02626;
+    --red-dim: #fbe3e3;
+    --purple: #6b34c4;
+  }
 }
 
 * { box-sizing: border-box; }
@@ -81,7 +121,7 @@ code, .mono { font-family: var(--mono); font-size: 0.9em; }
 .status { display: inline-block; padding: 3px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; letter-spacing: 0.3px; }
 .status.HEALTHY { background: var(--green-dim); color: var(--green); }
 .status.CLAIMED { background: var(--amber-dim); color: var(--amber); }
-.status.ACTIVE { background: #1a3a52; color: var(--accent); }
+.status.ACTIVE { background: var(--surface-2); color: var(--accent); }
 .status.OPEN { background: var(--surface-2); color: var(--muted); }
 .status.CANCELLED { background: var(--surface-2); color: var(--dim); }
 
@@ -153,10 +193,10 @@ tr:last-child td { border-bottom: none; }
   padding: 9px 16px; border-radius: 7px; font-size: 13px; font-family: inherit;
   cursor: pointer; font-weight: 500;
 }
-.btn:hover:not(:disabled) { background: #232b3d; border-color: var(--accent); }
+.btn:hover:not(:disabled) { background: var(--surface-2); border-color: var(--accent); }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; }
-.btn.primary { background: var(--accent); border-color: var(--accent); color: #04131f; font-weight: 600; }
-.btn.primary:hover:not(:disabled) { background: #66b0ff; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--bg); font-weight: 600; }
+.btn.primary:hover:not(:disabled) { filter: brightness(1.15); }
 
 .field { display: flex; flex-direction: column; gap: 5px; }
 .field span { color: var(--muted); font-size: 12px; }
@@ -165,3 +205,23 @@ tr:last-child td { border-bottom: none; }
   padding: 9px 11px; border-radius: 7px; font-family: var(--mono); font-size: 13px;
 }
 .field input:focus { outline: none; border-color: var(--accent); }
+
+/* ---- settings ---- */
+.setting { padding: 16px 0; border-bottom: 1px solid var(--border); }
+.setting:last-child { border-bottom: none; }
+.setting-head { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; }
+.setting-title { font-weight: 600; font-size: 14px; }
+.setting-desc { color: var(--muted); font-size: 12px; margin-top: 3px; max-width: 640px; line-height: 1.5; }
+.setting-control { margin-top: 10px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 7px; overflow: hidden; }
+.seg button {
+  background: var(--surface-2); border: none; color: var(--muted);
+  padding: 7px 14px; font-size: 13px; font-family: inherit; cursor: pointer;
+}
+.seg button + button { border-left: 1px solid var(--border); }
+.seg button.on { background: var(--accent); color: var(--bg); font-weight: 600; }
+.setting-control input[type="text"], .setting-control input[type="number"] {
+  background: var(--bg); border: 1px solid var(--border); color: var(--text);
+  padding: 8px 11px; border-radius: 7px; font-family: var(--mono); font-size: 12px;
+}
+.setting-control input[type="text"] { min-width: 380px; max-width: 100%; }
