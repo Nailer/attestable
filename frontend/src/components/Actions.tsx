@@ -98,7 +98,12 @@ export function ConnectBar({
 
 /** Kestrel's screen: open a cover and put collateral behind it. */
 export function CreateCoverForm({ onDone }: { onDone: () => void }) {
-  const [hours, setHours] = useState('24');
+  // Minutes, not hours. The previous 24-hour default meant a cover could not be
+  // settled for a day — which made the app impossible to actually try. And the
+  // lead time is now explicit, because a fixed 15 minutes silently made covers
+  // unbuyable if you did not act fast enough.
+  const [minutes, setMinutes] = useState('20');
+  const [leadMinutes, setLeadMinutes] = useState('10');
   const [tolerance, setTolerance] = useState('90');
   const [collateral, setCollateral] = useState('200');
   const [premium, setPremium] = useState('12');
@@ -124,12 +129,12 @@ export function CreateCoverForm({ onDone }: { onDone: () => void }) {
       const sepolia = new ethers.JsonRpcProvider(CONFIG.sepoliaRpc);
       const head = await sepolia.getBlockNumber();
       const now = Math.floor(Date.now() / 1000);
-      const LEAD_SECS = 15 * 60; // buyers need a window to purchase in
-      const durationSecs = Math.round(Number(hours) * 3600);
-      const startBlock = head + Math.floor(LEAD_SECS / 12);
+      const leadSecs = Math.round(Number(leadMinutes) * 60);
+      const durationSecs = Math.round(Number(minutes) * 60);
+      const startBlock = head + Math.floor(leadSecs / 12);
       const terms: NewCoverTerms = {
-        windowStart: now + LEAD_SECS,
-        windowEnd: now + LEAD_SECS + durationSecs,
+        windowStart: now + leadSecs,
+        windowEnd: now + leadSecs + durationSecs,
         windowStartBlock: startBlock,
         windowEndBlock: startBlock + Math.ceil(durationSecs / 12) + 50, // + margin
         toleranceSecs: Math.round(Number(tolerance) * 60),
@@ -157,8 +162,12 @@ export function CreateCoverForm({ onDone }: { onDone: () => void }) {
 
       <div className="grid two">
         <label className="field">
-          <span>Coverage duration (hours)</span>
-          <input value={hours} onChange={(e) => setHours(e.target.value)} inputMode="decimal" />
+          <span>Coverage duration (minutes)</span>
+          <input value={minutes} onChange={(e) => setMinutes(e.target.value)} inputMode="decimal" />
+        </label>
+        <label className="field">
+          <span>Buying window before coverage starts (minutes)</span>
+          <input value={leadMinutes} onChange={(e) => setLeadMinutes(e.target.value)} inputMode="decimal" />
         </label>
         <label className="field">
           <span>Staleness tolerance (minutes)</span>
@@ -181,6 +190,16 @@ export function CreateCoverForm({ onDone }: { onDone: () => void }) {
           minutes will pay claims against a functioning feed. 90 is the recommended setting.
         </p>
       )}
+
+      <p className="footnote">
+        <b>Timeline.</b> Coverage opens in {leadMinutes} min — it must be bought before then, since
+        a cover whose outcome is already observable is no longer insurance. It closes{' '}
+        {minutes} min later, and becomes settleable roughly 8 minutes after that, once Attestcoin
+        has attested the source blocks covering the window's end.
+        <br />
+        Total time to a finished cycle: about{' '}
+        <b>{Math.round(Number(leadMinutes) + Number(minutes) + 8)} minutes</b>.
+      </p>
 
       <button className="btn primary" disabled={busy} onClick={submit} style={{ marginTop: 14 }}>
         {busy ? 'Confirm in your wallet…' : `Post ${collateral} tCTC and open the cover`}
@@ -210,6 +229,14 @@ export function CoverActions({
   const isUnderwriter = me === cover.underwriter.toLowerCase();
   const canAct = wallet?.onCorrectChain;
 
+  // Timing gates the contract enforces. Surfacing them here means a user sees
+  // "opens in 4 min" rather than discovering a revert after paying gas.
+  const nowSecs = Math.floor(Date.now() / 1000);
+  const windowOpened = nowSecs >= cover.policy.windowStart;
+  const windowClosed = nowSecs >= cover.policy.windowEnd;
+  const untilOpen = Math.ceil((cover.policy.windowStart - nowSecs) / 60);
+  const untilClose = Math.ceil((cover.policy.windowEnd - nowSecs) / 60);
+
   async function run(fn: () => Promise<string>, label: string) {
     setBusy(true);
     setErr(null);
@@ -231,7 +258,7 @@ export function CoverActions({
 
   return (
     <div style={{ marginTop: 16, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-      {cover.status === 'OPEN' && !isUnderwriter && (
+      {cover.status === 'OPEN' && !windowOpened && (
         <button
           className="btn primary"
           disabled={busy || !canAct}
@@ -239,6 +266,19 @@ export function CoverActions({
         >
           Buy this cover for {fmtCtc(cover.originalPremium)}
         </button>
+      )}
+
+      {cover.status === 'OPEN' && !windowOpened && (
+        <span className="footnote" style={{ margin: 0 }}>
+          Coverage opens in {untilOpen} min — buy before then.
+        </span>
+      )}
+
+      {cover.status === 'OPEN' && windowOpened && (
+        <span className="footnote" style={{ margin: 0, color: 'var(--amber)' }}>
+          No longer purchasable — the coverage window already opened, so the outcome is partly
+          observable. The underwriter can cancel and reclaim the collateral.
+        </span>
       )}
 
       {cover.status === 'OPEN' && isUnderwriter && (
@@ -254,7 +294,7 @@ export function CoverActions({
       {cover.status === 'ACTIVE' && (
         <button
           className="btn"
-          disabled={busy || !canAct}
+          disabled={busy || !canAct || !windowClosed}
           onClick={() => run(() => settle(cover.id), 'Settled')}
         >
           Settle this cover
@@ -263,7 +303,9 @@ export function CoverActions({
 
       {cover.status === 'ACTIVE' && (
         <span className="footnote" style={{ margin: 0 }}>
-          Anyone may settle — it can only pay out according to evidence already verified.
+          {windowClosed
+            ? 'Anyone may settle — it can only pay out according to evidence already verified. If Attestcoin has not yet attested the window\'s end, this will say so and you can retry shortly.'
+            : `Coverage closes in ${untilClose} min. Settlement is only possible after that, plus roughly 8 minutes for Attestcoin to attest the final blocks.`}
         </span>
       )}
 
