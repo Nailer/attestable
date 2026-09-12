@@ -27,8 +27,6 @@ contract AttestableASC {
     INativeQueryVerifier public immutable VERIFIER;
     IAttestableCover public immutable COVER;
 
-    mapping(bytes32 => bool) public seenQueries;
-
     /// @dev Mirrors the decoded event for the UI. The Cover contract only needs
     /// the timestamp; price and roundId are surfaced here for the explorer.
     event EvidenceVerified(
@@ -49,6 +47,10 @@ contract AttestableASC {
     error NoMatchingEvent(bytes32 eventSignature);
     error WrongEmitter(address expected, address got);
     error MalformedEvent(uint256 topicCount, uint256 dataLength);
+    /// @dev More than one log in the transaction matched both the policy's event
+    /// signature AND its source contract. Which one constitutes "the evidence"
+    /// is then genuinely ambiguous, so we refuse rather than guess.
+    error AmbiguousEvidence(uint256 matchCount);
 
     constructor(address cover) {
         VERIFIER = NativeQueryVerifierLib.getVerifier();
@@ -70,7 +72,8 @@ contract AttestableASC {
         // CHECK 1 — evidence must come from the source chain this cover names.
         if (proof.chainKey != policy.chainKey) revert WrongChainKey(policy.chainKey, proof.chainKey);
 
-        queryId = _computeQueryId(proof);
+        // Evidence identity is computed AFTER decoding, because it must include
+        // which log within the transaction was used — see _decode.
 
         // CHECK 2 — cryptographic verification. Inclusion in the block, and that
         // block's descent from an attested one. Everything below is hearsay
@@ -94,9 +97,17 @@ contract AttestableASC {
             if (!ok) revert ProofRejected();
         }
 
-        seenQueries[queryId] = true;
+        (int256 price, uint256 roundId, uint64 updatedAt, uint256 logIndex) =
+            _decode(proof.encodedTransaction, policy);
 
-        (int256 price, uint256 roundId, uint64 updatedAt) = _decode(proof.encodedTransaction, policy);
+        // Evidence identity is EVENT-level, not transaction-level.
+        //
+        // A transaction can contain several logs. Identifying evidence only by
+        // (chain, block, txIndex) would make two distinct events inside the same
+        // transaction indistinguishable — so consuming one would silently
+        // consume the other. logIndex is what makes each piece of evidence
+        // uniquely addressable.
+        queryId = _evidenceId(proof, logIndex);
 
         emit EvidenceVerified(
             coverId, queryId, proof.blockHeight, policy.sourceContract, price, roundId, updatedAt
@@ -111,7 +122,7 @@ contract AttestableASC {
     function _decode(bytes calldata encodedTransaction, EvidencePolicy memory policy)
         private
         pure
-        returns (int256 price, uint256 roundId, uint64 updatedAt)
+        returns (int256 price, uint256 roundId, uint64 updatedAt, uint256 logIndex)
     {
         uint8 txType = EvmV1Decoder.getTransactionType(encodedTransaction);
         if (!EvmV1Decoder.isValidTransactionType(txType)) revert UnsupportedTransactionType(txType);
@@ -123,18 +134,53 @@ contract AttestableASC {
         // let a failed price update settle a cover.
         if (receipt.receiptStatus != 1) revert SourceTransactionFailed(receipt.receiptStatus);
 
-        EvmV1Decoder.LogEntry[] memory logs =
-            EvmV1Decoder.getLogsByEventSignature(receipt, policy.eventSignature);
-        if (logs.length == 0) revert NoMatchingEvent(policy.eventSignature);
+        // CHECK 4 — select the evidence log UNAMBIGUOUSLY.
+        //
+        // The receipt's logs are scanned directly rather than via
+        // getLogsByEventSignature(), for two reasons:
+        //
+        //  1. That helper matches on signature ALONE. A transaction can contain
+        //     the same event emitted by a DIFFERENT contract, so taking its
+        //     first result could hand us a lookalike event from an impostor
+        //     while the emitter check passes on the wrong log entirely. We match
+        //     on signature AND emitter together.
+        //
+        //  2. It discards position. Evidence identity must be event-level (see
+        //     _evidenceId), and LogEntry carries no index — so the index has to
+        //     be recovered from the scan itself.
+        //
+        // Spike 1.4 measured a single Chainlink update emitting THREE events in
+        // one transaction, so multiple matches are a real scenario here, not a
+        // theoretical one.
+        uint256 matches;
+        EvmV1Decoder.LogEntry memory log;
+        for (uint256 i = 0; i < receipt.receiptLogs.length; i++) {
+            EvmV1Decoder.LogEntry memory candidate = receipt.receiptLogs[i];
+            if (candidate.topics.length == 0) continue;
+            if (candidate.topics[0] != policy.eventSignature) continue;
+            if (candidate.address_ != policy.sourceContract) continue;
+            matches++;
+            log = candidate;
+            logIndex = i;
+        }
 
-        EvmV1Decoder.LogEntry memory log = logs[0];
+        if (matches == 0) {
+            // Distinguish "no such event at all" from "right event, wrong
+            // emitter" — the second is the impostor attack and deserves its own
+            // error so rejection tests can assert which defence fired.
+            for (uint256 i = 0; i < receipt.receiptLogs.length; i++) {
+                EvmV1Decoder.LogEntry memory candidate = receipt.receiptLogs[i];
+                if (candidate.topics.length > 0 && candidate.topics[0] == policy.eventSignature) {
+                    revert WrongEmitter(policy.sourceContract, candidate.address_);
+                }
+            }
+            revert NoMatchingEvent(policy.eventSignature);
+        }
 
-        // CHECK 4 — the event must come from the contract this policy names.
-        // THE ATTACK THIS BLOCKS: deploy a lookalike contract, emit an
-        // identically-shaped event carrying an invented price, and obtain a
-        // completely honest proof of it. The proof is real; the evidence is
-        // worthless. Verified rejected in spike 1.13 attack A5.
-        if (log.address_ != policy.sourceContract) revert WrongEmitter(policy.sourceContract, log.address_);
+        // THE ATTACK THIS BLOCKS: an impostor contract emitting an
+        // identically-shaped event with an invented price, proven honestly. The
+        // proof is real; the evidence is worthless. Rejected live in spike 1.13.
+        if (matches > 1) revert AmbiguousEvidence(matches);
 
         // CHECK 5 — shape, verified against real logs in spike 1.8A:
         //   topics[0] = event signature
@@ -157,21 +203,18 @@ contract AttestableASC {
         updatedAt = uint64(abi.decode(log.data, (uint256)));
     }
 
-    /// @dev Identifies a query by its position on the source chain: which chain,
-    /// which block, which index within that block.
-    function _computeQueryId(ProofData calldata proof) private view returns (bytes32 queryId) {
+    /// @dev Identifies one piece of evidence by its exact position on the source
+    /// chain: which chain, which block, which transaction, and which log inside
+    /// that transaction.
+    ///
+    /// `logIndex` is the part that matters. Without it the identity is
+    /// transaction-level, so two distinct events inside the same transaction
+    /// collide — consuming one would silently consume the other, and a cover
+    /// could be denied evidence it was entitled to.
+    function _evidenceId(ProofData calldata proof, uint256 logIndex) private view returns (bytes32) {
         uint256 txIndex = VERIFIER.calculateTxIndex(
             INativeQueryVerifier.MerkleProof({root: proof.merkleRoot, siblings: proof.siblings})
         );
-        uint64 chainKey = proof.chainKey;
-        uint64 blockHeight = proof.blockHeight;
-
-        assembly {
-            let ptr := mload(0x40)
-            mstore(ptr, chainKey)
-            mstore(add(ptr, 32), shl(192, blockHeight))
-            mstore(add(ptr, 40), txIndex)
-            queryId := keccak256(ptr, 72)
-        }
+        return keccak256(abi.encode(proof.chainKey, proof.blockHeight, txIndex, logIndex));
     }
 }

@@ -204,6 +204,45 @@ contract AttestableASCTest is Test {
     /// wrong event still yields the correct settlement timestamp. The price
     /// field would be garbage (roundId read as price), but price does not enter
     /// settlement — only the timestamp does. A lucky escape, not a design.
+    /// @notice STEP 1 REGRESSION — evidence identity is now EVENT-level.
+    ///
+    /// This same transaction carries three events. Under the old
+    /// transaction-level identity, evidence drawn from different logs of the
+    /// same transaction produced an IDENTICAL id — so consuming one silently
+    /// consumed the others. Two covers whose policies name different events in
+    /// the same transaction must now receive distinct ids.
+    function test_EvidenceIdIsEventLevel_NotTransactionLevel() public {
+        uint256 a = _openCover(_defaultPolicy());
+        bytes32 idAnswerUpdated = asc.submitEvidence(a, _proof());
+
+        bytes32 newRound = keccak256("NewRound(uint256,address,uint256)");
+        uint256 b = _openCover(_policy(RealEvidence.AGGREGATOR, newRound, RealEvidence.CHAIN_KEY));
+        bytes32 idNewRound = asc.submitEvidence(b, _proof());
+
+        assertTrue(
+            idAnswerUpdated != idNewRound,
+            "two different logs in ONE transaction must have different evidence ids"
+        );
+    }
+
+    /// @notice Selection now matches signature AND emitter together.
+    ///
+    /// getLogsByEventSignature() matches on signature alone, so its first result
+    /// could be a lookalike event from an impostor contract. Scanning for both
+    /// at once means the impostor is never selected in the first place.
+    function test_ImpostorEventInSameTransactionIsNotSelected() public {
+        address impostor = address(0xBEEF);
+        uint256 id = _openCover(_policy(impostor, RealEvidence.ANSWER_UPDATED, RealEvidence.CHAIN_KEY));
+
+        // The real transaction contains AnswerUpdated from the REAL aggregator.
+        // A policy naming an impostor must be told the emitter was wrong, not
+        // handed the real aggregator's event by accident.
+        vm.expectRevert(
+            abi.encodeWithSelector(AttestableASC.WrongEmitter.selector, impostor, RealEvidence.AGGREGATOR)
+        );
+        asc.submitEvidence(id, _proof());
+    }
+
     function test_PolicyNamingADifferentRealEvent_DecodesThatEventInstead() public {
         bytes32 newRound = keccak256("NewRound(uint256,address,uint256)");
         uint256 id = _openCover(_policy(RealEvidence.AGGREGATOR, newRound, RealEvidence.CHAIN_KEY));

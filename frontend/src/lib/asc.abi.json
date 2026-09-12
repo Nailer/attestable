@@ -38,25 +38,6 @@
   },
   {
     "type": "function",
-    "name": "seenQueries",
-    "inputs": [
-      {
-        "name": "",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "submitEvidence",
     "inputs": [
       {
@@ -176,6 +157,17 @@
       }
     ],
     "anonymous": false
+  },
+  {
+    "type": "error",
+    "name": "AmbiguousEvidence",
+    "inputs": [
+      {
+        "name": "matchCount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
   },
   {
     "type": "error",
