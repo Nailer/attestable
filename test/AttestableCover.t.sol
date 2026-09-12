@@ -70,6 +70,7 @@ contract AttestableCoverTest is Test {
             eventSignature: ANSWER_UPDATED,
             windowStart: WINDOW_START,
             windowEnd: WINDOW_END,
+            windowStartBlock: 0,
             windowEndBlock: WINDOW_END_BLOCK,
             toleranceSecs: TOLERANCE
         });

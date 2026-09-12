@@ -82,6 +82,7 @@ async function writeContract(): Promise<ethers.Contract> {
 export interface NewCoverTerms {
   windowStart: number;
   windowEnd: number;
+  windowStartBlock: number;
   windowEndBlock: number;
   toleranceSecs: number;
   collateralCtc: string;
@@ -97,6 +98,7 @@ export async function createCover(t: NewCoverTerms): Promise<{ hash: string; cov
     eventSignature: CONFIG.answerUpdatedTopic,
     windowStart: t.windowStart,
     windowEnd: t.windowEnd,
+    windowStartBlock: t.windowStartBlock,
     windowEndBlock: t.windowEndBlock,
     toleranceSecs: t.toleranceSecs,
   };

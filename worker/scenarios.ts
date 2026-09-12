@@ -14,6 +14,7 @@ export interface Scenario {
   expect: 'HEALTHY' | 'CLAIMED';
   windowStart: number;
   windowEnd: number;
+  windowStartBlock: number;
   windowEndBlock: number;
   toleranceSecs: number;
   note: string;
@@ -44,6 +45,7 @@ export async function outageScenario(_p: ethers.JsonRpcProvider): Promise<Scenar
     expect: 'CLAIMED',
     windowStart: await blockTime(p, startBlock),
     windowEnd: await blockTime(p, endBlock),
+    windowStartBlock: startBlock,
     windowEndBlock: endBlock,
     toleranceSecs: TOLERANCE_SECS,
     note: 'Real 12.9-hour lapse on Sepolia ETH/USD, 2026-08-31.',
@@ -79,6 +81,7 @@ export async function healthyScenario(
     expect: 'HEALTHY',
     windowStart: stamps[startIdx].ts,
     windowEnd: stamps[endIdx].ts,
+    windowStartBlock: stamps[startIdx].block,
     windowEndBlock: stamps[endIdx].block,
     toleranceSecs: TOLERANCE_SECS,
     note: `Steady period, ${endIdx - startIdx + 1} updates, all gaps within tolerance.`,

@@ -19,6 +19,19 @@
   },
   {
     "type": "function",
+    "name": "MIN_SOURCE_BLOCK_SECS",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint64",
+        "internalType": "uint64"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "asc",
     "inputs": [],
     "outputs": [
@@ -111,6 +124,11 @@
           },
           {
             "name": "windowEnd",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "windowStartBlock",
             "type": "uint64",
             "internalType": "uint64"
           },
@@ -208,6 +226,11 @@
                 "internalType": "uint64"
               },
               {
+                "name": "windowStartBlock",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
                 "name": "windowEndBlock",
                 "type": "uint64",
                 "internalType": "uint64"
@@ -286,6 +309,11 @@
             "internalType": "uint64"
           },
           {
+            "name": "windowStartBlock",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
             "name": "windowEndBlock",
             "type": "uint64",
             "internalType": "uint64"
@@ -303,25 +331,6 @@
   {
     "type": "function",
     "name": "isActive",
-    "inputs": [
-      {
-        "name": "coverId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "isRetrospective",
     "inputs": [
       {
         "name": "coverId",
@@ -546,12 +555,6 @@
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
-      },
-      {
-        "name": "retrospective",
-        "type": "bool",
-        "indexed": false,
-        "internalType": "bool"
       }
     ],
     "anonymous": false
@@ -674,6 +677,22 @@
   },
   {
     "type": "error",
+    "name": "EndBlockUndershoots",
+    "inputs": [
+      {
+        "name": "given",
+        "type": "uint64",
+        "internalType": "uint64"
+      },
+      {
+        "name": "minimumRequired",
+        "type": "uint64",
+        "internalType": "uint64"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "EvidenceAlreadyUsed",
     "inputs": [
       {
@@ -719,6 +738,11 @@
         "internalType": "uint64"
       }
     ]
+  },
+  {
+    "type": "error",
+    "name": "InvalidBlockRange",
+    "inputs": []
   },
   {
     "type": "error",
@@ -782,6 +806,22 @@
     "type": "error",
     "name": "TransferFailed",
     "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "WindowAlreadyStarted",
+    "inputs": [
+      {
+        "name": "windowStart",
+        "type": "uint64",
+        "internalType": "uint64"
+      },
+      {
+        "name": "nowTs",
+        "type": "uint64",
+        "internalType": "uint64"
+      }
+    ]
   },
   {
     "type": "error",

@@ -66,6 +66,7 @@ contract AdversarialTest is Test {
 
     uint64 constant W_START = RealEvidence.EXPECTED_UPDATED_AT - 2 hours;
     uint64 constant W_END = RealEvidence.EXPECTED_UPDATED_AT + 2 hours;
+    uint64 constant W_START_BLOCK = RealEvidence.BLOCK_HEIGHT - 1000;
     uint64 constant W_END_BLOCK = RealEvidence.BLOCK_HEIGHT + 1000;
     uint32 constant TOLERANCE = 5400;
 
@@ -98,16 +99,44 @@ contract AdversarialTest is Test {
             eventSignature: RealEvidence.ANSWER_UPDATED,
             windowStart: W_START,
             windowEnd: W_END,
+            windowStartBlock: W_START_BLOCK,
             windowEndBlock: W_END_BLOCK,
             toleranceSecs: TOLERANCE
         });
     }
 
+    /// @dev Coverage must be bought before its window opens, so time is rewound
+    /// to before windowStart to purchase, then advanced past windowEnd so the
+    /// cover is settleable.
     function _active() internal returns (uint256 id) {
+        uint256 resume = block.timestamp;
+        vm.warp(W_START - 1 hours);
         vm.prank(underwriter);
         id = cover.createCover{value: COLLATERAL}(_policy(), PREMIUM);
         vm.prank(buyer);
         cover.buyCover{value: PREMIUM}(id);
+        vm.warp(resume);
+    }
+
+    /// @dev Give a policy a block span that satisfies the MIN_SOURCE_BLOCK_SECS
+    /// invariant for its own duration.
+    function _withValidBlocks(EvidencePolicy memory p) internal pure returns (EvidencePolicy memory) {
+        p.windowStartBlock = W_START_BLOCK;
+        p.windowEndBlock = W_START_BLOCK + (p.windowEnd - p.windowStart) / 12 + 1;
+        return p;
+    }
+
+    /// @dev Create and buy a cover under the new rules: purchase happens before
+    /// windowStart, then time advances past windowEnd so it can settle.
+    function _activeWith(EvidencePolicy memory p) internal returns (uint256 id) {
+        p = _withValidBlocks(p);
+        uint256 resume = block.timestamp;
+        vm.warp(uint256(p.windowStart) - 1 hours);
+        vm.prank(underwriter);
+        id = cover.createCover{value: COLLATERAL}(p, PREMIUM);
+        vm.prank(buyer);
+        cover.buyCover{value: PREMIUM}(id);
+        vm.warp(resume > uint256(p.windowEnd) ? resume : uint256(p.windowEnd) + 1);
     }
 
     function _proof() internal pure returns (ProofData memory p) {
@@ -136,14 +165,18 @@ contract AdversarialTest is Test {
      * Before the fix this drained 200 ether instantly.
      */
     function test_Exploit_CannotSettleBeforeWindowCloses() public {
+        // A window that is still open. The block span satisfies the invariant,
+        // so the ONLY thing preventing settlement is the wall-clock check.
         EvidencePolicy memory p = _policy();
-        p.windowEnd = uint64(block.timestamp) + 30 days; // window still open
-        // windowEndBlock deliberately left in the already-attested past
+        p.windowStart = uint64(block.timestamp) + 1 hours;
+        p.windowEnd = p.windowStart + 30 days;
+        p = _withValidBlocks(p);
 
         vm.prank(underwriter);
         uint256 id = cover.createCover{value: COLLATERAL}(p, PREMIUM);
         vm.prank(buyer);
         cover.buyCover{value: PREMIUM}(id);
+        vm.warp(uint256(p.windowStart) + 1 days); // inside, not past, the window
 
         uint256 before = buyer.balance;
 
@@ -162,28 +195,76 @@ contract AdversarialTest is Test {
     }
 
     /**
-     * EXPLOIT 2 — adverse selection on an already-decided window.
+     * EXPLOIT 2 — adverse selection on a window whose outcome is observable.
      *
-     * Buying a cover whose window has already closed means the outcome is fixed
-     * by history: the premium is not a price for risk. Either side could exploit
-     * the other by knowing the answer in advance.
-     *
-     * We permit it — demonstrating settlement against real past evidence is
-     * legitimate — but it must be UNMISTAKABLE, never silent.
+     * Previously a cover could be bought after its window had already closed,
+     * flagged only by a boolean. A flag is not a control: the premium stops
+     * being a price for risk the moment either side can see how it turned out.
+     * Purchase is now refused once the window has begun.
      */
-    function test_Exploit_RetrospectivePurchaseIsFlagged() public {
-        uint256 id = _active(); // setUp warps past W_END, so this is retrospective
-        assertTrue(cover.isRetrospective(id), "a closed-window purchase must be flagged");
+    function test_Exploit_CannotBuyAfterWindowOpens() public {
+        vm.prank(underwriter);
+        uint256 id = cover.createCover{value: COLLATERAL}(_policy(), PREMIUM);
 
-        // A genuinely forward-looking cover must NOT be flagged.
+        // setUp() warps past W_END, so this cover's window is already over.
+        vm.prank(buyer);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                AttestableCover.WindowAlreadyStarted.selector, W_START, uint64(block.timestamp)
+            )
+        );
+        cover.buyCover{value: PREMIUM}(id);
+
+        // A genuinely forward-looking cover is still purchasable.
         EvidencePolicy memory p = _policy();
         p.windowStart = uint64(block.timestamp) + 1 hours;
         p.windowEnd = uint64(block.timestamp) + 25 hours;
+        p.windowStartBlock = 1_000_000;
+        p.windowEndBlock = 1_000_000 + (24 hours) / 12;
         vm.prank(underwriter);
         uint256 fwd = cover.createCover{value: COLLATERAL}(p, PREMIUM);
         vm.prank(buyer);
         cover.buyCover{value: PREMIUM}(fwd);
-        assertFalse(cover.isRetrospective(fwd), "an open-window purchase is not retrospective");
+        assertEq(uint8(cover.getCover(fwd).status), uint8(CoverStatus.ACTIVE));
+    }
+
+    /**
+     * EXPLOIT 3 — an end block that undershoots the window.
+     *
+     * windowEnd (a timestamp) and windowEndBlock (a source height) describe the
+     * same instant in different units, but nothing forced them to agree. An end
+     * block set too low means the attestation gate passes while the window's
+     * final source blocks are still unprovable — so evidence that could not yet
+     * have been submitted is counted as absent, and the cover claims unfairly.
+     *
+     * A source block cannot arrive faster than 12s, so a window of D seconds
+     * spans at most D/12 blocks. Requiring that many makes undershooting
+     * impossible.
+     */
+    function test_Exploit_EndBlockCannotUndershootWindow() public {
+        EvidencePolicy memory p = _policy();
+        p.windowStart = uint64(block.timestamp) + 1 hours;
+        p.windowEnd = p.windowStart + 24 hours;
+        p.windowStartBlock = 1_000_000;
+        p.windowEndBlock = 1_000_010; // 10 blocks for a 24-hour window
+
+        uint64 required = 1_000_000 + uint64(24 hours) / 12; // 7200 blocks
+        vm.prank(underwriter);
+        vm.expectRevert(
+            abi.encodeWithSelector(AttestableCover.EndBlockUndershoots.selector, 1_000_010, required)
+        );
+        cover.createCover{value: COLLATERAL}(p, PREMIUM);
+
+        // Exactly the minimum is accepted.
+        p.windowEndBlock = required;
+        vm.prank(underwriter);
+        uint256 ok = cover.createCover{value: COLLATERAL}(p, PREMIUM);
+        assertEq(uint8(cover.getCover(ok).status), uint8(CoverStatus.OPEN));
+
+        // Overshooting is safe and also accepted — it only delays settlement.
+        p.windowEndBlock = required + 5000;
+        vm.prank(underwriter);
+        cover.createCover{value: COLLATERAL}(p, PREMIUM);
     }
 
     // ===============================================================
@@ -201,10 +282,7 @@ contract AdversarialTest is Test {
     function test_02_HealthySettlesToUnderwriter() public {
         EvidencePolicy memory p = _policy();
         p.toleranceSecs = 24 hours; // whole window fits inside tolerance
-        vm.prank(underwriter);
-        uint256 id = cover.createCover{value: COLLATERAL}(p, PREMIUM);
-        vm.prank(buyer);
-        cover.buyCover{value: PREMIUM}(id);
+        uint256 id = _activeWith(p);
 
         uint256 before = underwriter.balance;
         cover.settle(id);
@@ -246,10 +324,7 @@ contract AdversarialTest is Test {
     function test_06_WrongEmitterRejected() public {
         EvidencePolicy memory p = _policy();
         p.sourceContract = address(0xBEEF);
-        vm.prank(underwriter);
-        uint256 id = cover.createCover{value: COLLATERAL}(p, PREMIUM);
-        vm.prank(buyer);
-        cover.buyCover{value: PREMIUM}(id);
+        uint256 id = _activeWith(p);
 
         vm.expectRevert(
             abi.encodeWithSelector(AttestableASC.WrongEmitter.selector, address(0xBEEF), RealEvidence.AGGREGATOR)
@@ -261,10 +336,7 @@ contract AdversarialTest is Test {
     function test_07_AbsentEventSignatureRejected() public {
         EvidencePolicy memory p = _policy();
         p.eventSignature = keccak256("Transfer(address,address,uint256)");
-        vm.prank(underwriter);
-        uint256 id = cover.createCover{value: COLLATERAL}(p, PREMIUM);
-        vm.prank(buyer);
-        cover.buyCover{value: PREMIUM}(id);
+        uint256 id = _activeWith(p);
 
         vm.expectRevert(abi.encodeWithSelector(AttestableASC.NoMatchingEvent.selector, p.eventSignature));
         asc.submitEvidence(id, _proof());
@@ -275,11 +347,7 @@ contract AdversarialTest is Test {
         EvidencePolicy memory p = _policy();
         p.windowStart = RealEvidence.EXPECTED_UPDATED_AT + 10 days;
         p.windowEnd = RealEvidence.EXPECTED_UPDATED_AT + 20 days;
-        p.windowEndBlock = W_END_BLOCK;
-        vm.prank(underwriter);
-        uint256 id = cover.createCover{value: COLLATERAL}(p, PREMIUM);
-        vm.prank(buyer);
-        cover.buyCover{value: PREMIUM}(id);
+        uint256 id = _activeWith(p);
 
         vm.expectRevert();
         asc.submitEvidence(id, _proof());
@@ -368,13 +436,16 @@ contract AdversarialTest is Test {
         collateral = uint96(bound(collateral, 1e15, 1_000 ether));
         premium = uint96(bound(premium, 1e15, 1_000 ether));
 
-        EvidencePolicy memory p = _policy();
+        EvidencePolicy memory p = _withValidBlocks(_policy());
         if (healthy) p.toleranceSecs = 24 hours;
 
+        uint256 resume = block.timestamp;
+        vm.warp(uint256(p.windowStart) - 1 hours);
         vm.prank(underwriter);
         uint256 id = cover.createCover{value: collateral}(p, premium);
         vm.prank(buyer);
         cover.buyCover{value: premium}(id);
+        vm.warp(resume);
 
         uint256 ub = underwriter.balance;
         uint256 bb = buyer.balance;

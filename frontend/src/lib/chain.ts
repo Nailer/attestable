@@ -21,6 +21,7 @@ export interface Policy {
   eventSignature: string;
   windowStart: number;
   windowEnd: number;
+  windowStartBlock: number;
   windowEndBlock: number;
   toleranceSecs: number;
 }
@@ -113,6 +114,7 @@ export async function getCover(id: number): Promise<Cover> {
       eventSignature: c.policy.eventSignature,
       windowStart: Number(c.policy.windowStart),
       windowEnd: Number(c.policy.windowEnd),
+      windowStartBlock: Number(c.policy.windowStartBlock),
       windowEndBlock: Number(c.policy.windowEndBlock),
       toleranceSecs: Number(c.policy.toleranceSecs),
     },

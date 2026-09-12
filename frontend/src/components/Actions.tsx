@@ -111,17 +111,27 @@ export function CreateCoverForm({ onDone }: { onDone: () => void }) {
     setErr(null);
     setMsg(null);
     try {
-      // Forward-looking window starting now. windowEndBlock is estimated from
-      // Sepolia's ~12s block time; settlement waits for the attestation frontier
-      // to pass it, so a conservative estimate is safe.
+      // The window must open in the FUTURE — coverage cannot be bought once
+      // its outcome is observable, so a buyer needs time to take it.
+      //
+      // The end block is deliberately OVER-estimated. Ethereum slots are 12s
+      // and cannot be faster, so duration/12 is the maximum blocks a window can
+      // span; the contract enforces at least that. Overshooting only delays
+      // settlement slightly, whereas undershooting would let the attestation
+      // gate pass before the window's final blocks were provable. The earlier
+      // version of this form used a bare duration/12 estimate from the CURRENT
+      // head, which could land short once the delayed start was accounted for.
       const sepolia = new ethers.JsonRpcProvider(CONFIG.sepoliaRpc);
       const head = await sepolia.getBlockNumber();
       const now = Math.floor(Date.now() / 1000);
+      const LEAD_SECS = 15 * 60; // buyers need a window to purchase in
       const durationSecs = Math.round(Number(hours) * 3600);
+      const startBlock = head + Math.floor(LEAD_SECS / 12);
       const terms: NewCoverTerms = {
-        windowStart: now,
-        windowEnd: now + durationSecs,
-        windowEndBlock: head + Math.ceil(durationSecs / 12),
+        windowStart: now + LEAD_SECS,
+        windowEnd: now + LEAD_SECS + durationSecs,
+        windowStartBlock: startBlock,
+        windowEndBlock: startBlock + Math.ceil(durationSecs / 12) + 50, // + margin
         toleranceSecs: Math.round(Number(tolerance) * 60),
         collateralCtc: collateral,
         premiumCtc: premium,

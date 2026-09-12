@@ -43,6 +43,7 @@ async function main() {
     eventSignature: process.env.EVIDENCE_EVENT_SIGNATURE!,
     windowStart: events[0].ts,
     windowEnd: events[1].ts,
+    windowStartBlock: START_BLOCK,
     windowEndBlock: END_BLOCK,
     toleranceSecs: TOLERANCE_SECS,
   };

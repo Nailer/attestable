@@ -46,6 +46,7 @@ async function main() {
     eventSignature: process.env.EVIDENCE_EVENT_SIGNATURE!,
     windowStart: scenario.windowStart,
     windowEnd: scenario.windowEnd,
+    windowStartBlock: scenario.windowStartBlock,
     windowEndBlock: scenario.windowEndBlock,
     toleranceSecs: scenario.toleranceSecs,
   };

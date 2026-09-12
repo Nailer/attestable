@@ -95,6 +95,7 @@ contract AttestableASCTest is Test {
             eventSignature: sig,
             windowStart: WINDOW_START,
             windowEnd: WINDOW_END,
+            windowStartBlock: 0,
             windowEndBlock: WINDOW_END_BLOCK,
             toleranceSecs: TOLERANCE
         });

@@ -25,6 +25,21 @@ import {IChainInfo, ChainInfoLib} from "./interfaces/IChainInfo.sol";
 contract AttestableCover is IAttestableCover, Ownable, ReentrancyGuard {
     IChainInfo public immutable CHAIN_INFO;
 
+    /// @notice Fastest possible source-chain block interval, in seconds.
+    ///
+    /// Ethereum and its testnets have a FIXED 12-second slot. Blocks can be
+    /// slower than this when slots are missed, but never faster — which is what
+    /// makes it a safe lower bound rather than an estimate.
+    ///
+    /// This is the anchor for the windowEndBlock invariant below. A window of
+    /// D seconds can span at most D/12 blocks, so requiring
+    ///     windowEndBlock - windowStartBlock >= D / 12
+    /// guarantees windowEndBlock sits at or beyond the window's true final
+    /// block. Over-shooting is harmless — settlement simply waits a little
+    /// longer for the attestation frontier. Under-shooting is what must be
+    /// impossible.
+    uint64 public constant MIN_SOURCE_BLOCK_SECS = 12;
+
     /// @notice The only address permitted to report verified evidence.
     address public asc;
 
@@ -40,12 +55,7 @@ contract AttestableCover is IAttestableCover, Ownable, ReentrancyGuard {
     event CoverCreated(
         uint256 indexed coverId, address indexed underwriter, uint256 collateral, uint256 premium, uint32 toleranceSecs
     );
-    /// @param retrospective true if the coverage window had ALREADY ENDED when
-    /// this cover was purchased. The outcome is then already determined by
-    /// history, so the premium is not a price for risk. Surfaced loudly rather
-    /// than blocked, because demonstrating settlement against real past evidence
-    /// is legitimate — silently permitting it would not be.
-    event CoverPurchased(uint256 indexed coverId, address indexed buyer, uint256 premium, bool retrospective);
+    event CoverPurchased(uint256 indexed coverId, address indexed buyer, uint256 premium);
     event CoverCancelled(uint256 indexed coverId);
     event EvidenceRecorded(
         uint256 indexed coverId, bytes32 indexed queryId, uint64 updatedAt, uint64 gap, uint64 maxGap, int256 price
@@ -74,6 +84,14 @@ contract AttestableCover is IAttestableCover, Ownable, ReentrancyGuard {
     error EvidenceOutOfOrder(uint64 updatedAt, uint64 lastTimestamp);
     error WindowNotAttested(uint64 required, uint64 attested);
     error WindowNotClosed(uint64 windowEnd, uint64 nowTs);
+    /// @dev windowEndBlock undershoots what the window's duration requires, so
+    /// the attestation gate could pass before the window's final source blocks
+    /// were provable.
+    error EndBlockUndershoots(uint64 given, uint64 minimumRequired);
+    error InvalidBlockRange();
+    /// @dev The coverage window has already begun, so its outcome is at least
+    /// partially observable. Buying now is not pricing risk.
+    error WindowAlreadyStarted(uint64 windowStart, uint64 nowTs);
     error TransferFailed();
 
     modifier onlyAsc() {
@@ -107,6 +125,27 @@ contract AttestableCover is IAttestableCover, Ownable, ReentrancyGuard {
         if (premium == 0) revert ZeroPremium();
         if (policy.windowEnd <= policy.windowStart) revert InvalidWindow();
         if (policy.toleranceSecs == 0) revert ZeroTolerance();
+        if (policy.windowEndBlock <= policy.windowStartBlock) revert InvalidBlockRange();
+
+        // THE windowEnd <-> windowEndBlock INTEGRITY RULE.
+        //
+        // These are two independent user-supplied values describing the same
+        // instant in different units. Nothing else forces them to agree, and the
+        // dangerous direction is an end block that is too LOW: the attestation
+        // gate in settle() would then pass while the window's final source
+        // blocks were still unprovable, so evidence that legitimately could not
+        // have been submitted yet would be counted as absent.
+        //
+        // Since a source block cannot arrive faster than MIN_SOURCE_BLOCK_SECS,
+        // a window of D seconds spans at most D / MIN_SOURCE_BLOCK_SECS blocks.
+        // Requiring at least that many puts windowEndBlock at or beyond the
+        // window's true end. Overshooting only delays settlement; undershooting
+        // is now impossible.
+        uint64 minBlockSpan = (policy.windowEnd - policy.windowStart) / MIN_SOURCE_BLOCK_SECS;
+        uint64 actualSpan = policy.windowEndBlock - policy.windowStartBlock;
+        if (actualSpan < minBlockSpan) {
+            revert EndBlockUndershoots(policy.windowEndBlock, policy.windowStartBlock + minBlockSpan);
+        }
 
         coverId = nextCoverId++;
 
@@ -122,15 +161,24 @@ contract AttestableCover is IAttestableCover, Ownable, ReentrancyGuard {
 
     /// @notice Buyer takes the cover by paying exactly the stated premium.
     /// Terms are immutable from this point.
+    ///
+    /// Coverage must be bought BEFORE its window opens. Once the window has
+    /// begun the outcome is at least partially observable, so the premium stops
+    /// being a price for risk and becomes a wager on a partly-known result —
+    /// exploitable by whichever side is paying closer attention. Insurance
+    /// bought after the fire is not insurance.
     function buyCover(uint256 coverId) external payable {
         Cover storage c = _requireCover(coverId);
         if (c.status != CoverStatus.OPEN) revert WrongStatus(CoverStatus.OPEN, c.status);
+        if (block.timestamp >= c.policy.windowStart) {
+            revert WindowAlreadyStarted(c.policy.windowStart, uint64(block.timestamp));
+        }
         if (msg.value != c.premium) revert PremiumMismatch(c.premium, msg.value);
 
         c.buyer = msg.sender;
         c.status = CoverStatus.ACTIVE;
 
-        emit CoverPurchased(coverId, msg.sender, msg.value, block.timestamp >= c.policy.windowEnd);
+        emit CoverPurchased(coverId, msg.sender, msg.value);
     }
 
     /// @notice Underwriter reclaims collateral from a cover nobody bought.
@@ -267,14 +315,6 @@ contract AttestableCover is IAttestableCover, Ownable, ReentrancyGuard {
     // ------------------------------------------------------------------
     // Views
     // ------------------------------------------------------------------
-
-    /// @notice True if this cover's window had already closed when it was bought,
-    /// meaning the outcome was already fixed by history. Consumers should display
-    /// this prominently — it is the difference between insurance and a settled bet.
-    function isRetrospective(uint256 coverId) external view returns (bool) {
-        Cover storage c = _covers[coverId];
-        return c.buyer != address(0) && block.timestamp >= c.policy.windowEnd;
-    }
 
     function getPolicy(uint256 coverId) external view returns (EvidencePolicy memory) {
         return _covers[coverId].policy;

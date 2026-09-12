@@ -21,9 +21,14 @@ struct EvidencePolicy {
     /// `updatedAt`, never a block timestamp.
     uint64 windowStart;
     uint64 windowEnd;
-    /// @dev Source-chain block height at/after windowEnd. Settlement waits for
-    /// Attestcoin's attestation frontier to pass this, so a lagging attestor set
-    /// can never itself cause a payout.
+    /// @dev Source-chain block heights bracketing the window.
+    ///
+    /// These are timestamps' counterpart in block space, and the relationship
+    /// between the two is ENFORCED at creation — see AttestableCover's
+    /// MIN_SOURCE_BLOCK_SECS invariant. Left unconstrained, an end block that
+    /// undershoots the window's true end would let the attestation gate pass
+    /// before the window's final blocks were provable.
+    uint64 windowStartBlock;
     uint64 windowEndBlock;
     /// @dev Maximum permitted silence between consecutive updates, in seconds.
     /// MUST exceed the feed's real worst-case gap. Measured at 61.4 min for
