@@ -77,7 +77,8 @@ code, .mono { font-family: var(--mono); font-size: 0.9em; }
 
 /* ---- header ---- */
 .header { border-bottom: 1px solid var(--border); padding-bottom: 24px; margin-bottom: 28px; }
-.header h1 { margin: 0 0 6px; font-size: 30px; letter-spacing: -0.5px; }
+.brand { display: flex; align-items: center; gap: 11px; margin-bottom: 6px; }
+.header h1 { margin: 0; font-size: 30px; letter-spacing: -0.5px; }
 .header .tag { color: var(--muted); font-size: 15px; margin: 0 0 14px; max-width: 760px; }
 .header .chips { display: flex; gap: 8px; flex-wrap: wrap; }
 

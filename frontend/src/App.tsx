@@ -21,6 +21,7 @@ import { currentState, type WalletState } from './lib/wallet';
 import { SubmitEvidencePanel } from './components/SubmitEvidence';
 import { SettingsPanel } from './components/Settings';
 import { useSettings } from './lib/settings';
+import { Logo } from './components/Logo';
 
 type Tab = 'covers' | 'write' | 'evidence' | 'health' | 'trust' | 'settings';
 
@@ -96,7 +97,10 @@ export default function App() {
   return (
     <div className="wrap">
       <header className="header">
-        <h1>Attestable</h1>
+        <div className="brand">
+          <Logo size={34} />
+          <h1>Attestable</h1>
+        </div>
         <p className="tag">
           Parametric coverage for blockchain infrastructure failure — settled by cryptographic proof
           of what happened on another chain, not by a claims process.
