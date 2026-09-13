@@ -1,13 +1,14 @@
 /**
  * The Attestable mark.
  *
- * A shield — coverage — whose check is drawn as two strokes rather than one.
- * They are the two chains: evidence originates on Ethereum, settlement happens
- * on Creditcoin, and the check is the point where one is proven to the other.
+ * A monogram A whose crossbar is a separate, brighter element that spans — and
+ * slightly overhangs — the two legs. The legs are the two chains: evidence
+ * originates on one, settlement happens on the other. The crossbar is the proof
+ * that bridges them, which is the only reason the two halves form one letter.
  *
- * Theme-aware: the descending stroke uses the page background so the mark reads
- * correctly in both light and dark, rather than being a dark shape that
- * disappears on a dark page.
+ * It sits on its own ground rather than borrowing the page's. The previous mark
+ * painted a stroke in var(--bg), so it only resolved correctly on a surface it
+ * happened to match — it broke anywhere else it was placed.
  */
 export function Logo({ size = 30 }: { size?: number }) {
   return (
@@ -20,34 +21,25 @@ export function Logo({ size = 30 }: { size?: number }) {
       style={{ display: 'block', flex: '0 0 auto' }}
     >
       <defs>
-        <linearGradient id="attestable-shield" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="var(--accent)" />
-          <stop offset="1" stopColor="var(--accent)" stopOpacity="0.72" />
+        <linearGradient id="attestable-ground" x1="0" y1="0" x2="0.4" y2="1">
+          <stop offset="0" stopColor="#1b2740" />
+          <stop offset="1" stopColor="#0d1421" />
         </linearGradient>
       </defs>
 
-      <path
-        d="M32 4 54 12v20c0 12.5-8.5 23.5-22 28C18.5 55.5 10 44.5 10 32V12z"
-        fill="url(#attestable-shield)"
-      />
+      <rect width="64" height="64" rx="15" fill="url(#attestable-ground)" />
 
-      {/* source chain */}
+      {/* the two chains */}
       <path
-        d="M20 32.5 29 41.5"
-        fill="none"
-        stroke="var(--bg)"
-        strokeWidth="6.5"
-        strokeLinecap="round"
-        opacity="0.9"
-      />
-      {/* settlement chain */}
-      <path
-        d="M29 41.5 45 24"
+        d="M17 49 L32 16 L47 49"
         fill="none"
         stroke="#ffffff"
-        strokeWidth="6.5"
+        strokeWidth="6.6"
         strokeLinecap="round"
+        strokeLinejoin="round"
       />
+      {/* the proof that bridges them */}
+      <path d="M20.5 38.5 H43.5" fill="none" stroke="#4a9eff" strokeWidth="6.2" strokeLinecap="round" />
     </svg>
   );
 }
