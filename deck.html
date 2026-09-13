@@ -91,6 +91,20 @@
   .flag b{color:var(--warn)}
 
   @media (max-width:640px){ .slide{padding:30px 24px} }
+
+  /* One slide per page, 16:9, for PDF export. */
+  @page{ size:330mm 186mm; margin:0 }
+  @media print{
+    body{background:#0d1421}
+    .wrap{max-width:none;padding:0;gap:0}
+    .topbar{display:none}
+    .slide{border-radius:0;box-shadow:none;break-after:page;break-inside:avoid;
+           min-height:186mm;padding:54px 64px;display:flex;flex-direction:column;justify-content:center}
+    .slide:last-child{break-after:auto}
+    .slide::after{border:none}
+    a{color:var(--accent);text-decoration:none}
+  }
+
 </style>
 
 <div class="wrap">
