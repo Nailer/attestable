@@ -1,0 +1,430 @@
+<title>Attestable Pitch Deck</title>
+<style>
+  :root{
+    --page:#eef0f4; --page-ink:#11161d; --page-ink-2:#5b6674;
+    --slide:#0d1421; --slide-2:#161f30; --slide-line:#26334a;
+    --on-slide:#f2f5f9; --on-slide-2:#9aa9bd; --on-slide-3:#6b7b92;
+    --accent:#4a9eff; --accent-soft:#1b3153;
+    --go:#3ddc97; --warn:#f0b849; --stop:#ff7a6e;
+    --sans:system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){ --page:#05080c; --page-ink:#e9edf3; --page-ink-2:#8a94a3; }
+  }
+  :root[data-theme="dark"]{ --page:#05080c; --page-ink:#e9edf3; --page-ink-2:#8a94a3; }
+
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--page);color:var(--page-ink);font-family:var(--sans);
+       font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1000px;margin:0 auto;padding:40px 20px 100px;display:flex;flex-direction:column;gap:20px}
+
+  .topbar{display:flex;flex-wrap:wrap;gap:10px;align-items:baseline;justify-content:space-between;
+          padding:0 4px 6px;color:var(--page-ink-2);font-size:12.5px}
+  .topbar b{color:var(--page-ink);font-weight:640}
+
+  .slide{background:var(--slide);color:var(--on-slide);border-radius:6px;padding:44px 48px;
+         position:relative;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.2),0 12px 30px rgba(5,10,20,.18)}
+  .slide::after{content:"";position:absolute;inset:0;border-radius:6px;
+                border:1px solid var(--slide-line);pointer-events:none}
+  .meta{display:flex;gap:10px;align-items:center;margin-bottom:22px;flex-wrap:wrap}
+  .num{font-family:var(--mono);font-size:11.5px;color:var(--on-slide-3);letter-spacing:.08em}
+  .pillar{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;
+          color:var(--accent);background:var(--accent-soft);padding:3px 8px;border-radius:2px}
+  .pillar.plain{color:var(--on-slide-2);background:#1c2537}
+
+  h1{font-size:clamp(34px,5.6vw,60px);line-height:1.02;letter-spacing:-.03em;font-weight:700;
+     margin:0 0 18px;text-wrap:balance}
+  h2{font-size:clamp(24px,3.4vw,36px);line-height:1.12;letter-spacing:-.022em;font-weight:680;
+     margin:0 0 16px;text-wrap:balance}
+  h3{font-size:14px;letter-spacing:.1em;text-transform:uppercase;color:var(--on-slide-3);
+     font-weight:660;margin:0 0 12px}
+  p{margin:0 0 14px;color:var(--on-slide-2);max-width:68ch;font-size:16.5px}
+  p:last-child{margin-bottom:0}
+  .lead{font-size:20px;line-height:1.45;color:var(--on-slide)}
+  strong{color:var(--on-slide);font-weight:640}
+  em{color:var(--accent);font-style:normal;font-weight:600}
+  .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+  .kicker{font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;
+          color:var(--accent);margin:0 0 14px}
+
+  .cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:22px;margin-top:8px}
+  .col h4{margin:0 0 8px;font-size:15.5px;font-weight:650;color:var(--on-slide)}
+  .col p{font-size:15px;margin:0;color:var(--on-slide-2)}
+
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:18px;margin:26px 0 4px}
+  .stat{border-top:1px solid var(--slide-line);padding-top:12px}
+  .stat .v{font-family:var(--mono);font-size:clamp(22px,3vw,30px);font-weight:600;color:var(--on-slide);
+           font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+  .stat .v.hl{color:var(--accent)}
+  .stat .k{font-size:12.5px;color:var(--on-slide-3);margin-top:4px}
+
+  ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:11px}
+  ul li{display:grid;grid-template-columns:auto 1fr;gap:11px;font-size:16px;color:var(--on-slide-2)}
+  ul li::before{content:"";width:5px;height:5px;border-radius:50%;background:var(--accent);margin-top:9px}
+  ul li b{color:var(--on-slide);font-weight:640}
+  ul.plain li::before{background:var(--on-slide-3)}
+
+  .quote{border-left:2px solid var(--accent);padding:2px 0 2px 20px;margin:6px 0 0}
+  .quote p{font-size:19px;line-height:1.45;color:var(--on-slide)}
+
+  table{width:100%;border-collapse:collapse;font-size:15px}
+  .scroll{overflow-x:auto}
+  th{text-align:left;font-size:10.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--on-slide-3);
+     font-weight:650;padding:0 14px 9px 0;border-bottom:1px solid var(--slide-line);white-space:nowrap}
+  td{padding:12px 14px 12px 0;border-bottom:1px solid #1a2334;color:var(--on-slide-2);vertical-align:top}
+  td b{color:var(--on-slide);font-weight:640}
+  td.num{font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--on-slide);white-space:nowrap}
+  tr:last-child td{border-bottom:none}
+
+  a{color:var(--accent);text-underline-offset:2px}
+  a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+  .mark{display:flex;align-items:center;gap:14px;margin-bottom:30px}
+  .mark span{font-size:21px;font-weight:660;letter-spacing:-.02em;color:var(--on-slide)}
+
+  .note{font-size:14px;color:var(--on-slide-3);margin-top:20px;padding-top:16px;
+        border-top:1px solid var(--slide-line);max-width:70ch}
+  .flag{margin-top:18px;padding:13px 16px;border-radius:3px;background:#1a2334;font-size:15px;
+        color:var(--on-slide-2)}
+  .flag b{color:var(--warn)}
+
+  @media (max-width:640px){ .slide{padding:30px 24px} }
+</style>
+
+<div class="wrap">
+
+  <div class="topbar">
+    <div><b>Attestable</b> · BUIDL CTC 2026 Fall · Creditcoin + Attestcoin Protocol</div>
+    <div>Emmanuel Aje Ayoola · Nigeria · 13 September 2026</div>
+  </div>
+
+  <!-- 01 -->
+  <section class="slide">
+    <div class="mark">
+      <svg width="46" height="46" viewBox="0 0 64 64" aria-label="Attestable">
+        <defs><linearGradient id="m1" x1="0" y1="0" x2="0.4" y2="1">
+          <stop offset="0" stop-color="#1b2740"/><stop offset="1" stop-color="#0d1421"/></linearGradient></defs>
+        <rect width="64" height="64" rx="15" fill="url(#m1)" stroke="#26334a"/>
+        <path d="M17 49 L32 16 L47 49" fill="none" stroke="#fff" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M20.5 38.5 H43.5" fill="none" stroke="#4a9eff" stroke-width="6.2" stroke-linecap="round"/>
+      </svg>
+      <span>Attestable</span>
+    </div>
+    <h1>Infrastructure risk has no financial counterparty.</h1>
+    <p class="lead">Attestable is parametric coverage for blockchain infrastructure failure —
+    settled by cryptographic proof of what happened on another chain, not by a claims process.</p>
+    <div class="stats">
+      <div class="stat"><div class="v hl">773.6 min</div><div class="k">real Chainlink outage, settled on-chain</div></div>
+      <div class="stat"><div class="v">200 CTC</div><div class="k">paid automatically, no human approval</div></div>
+      <div class="stat"><div class="v">51 / 51</div><div class="k">tests passing, incl. 12 adversarial properties</div></div>
+      <div class="stat"><div class="v">Live</div><div class="k">deployed on Creditcoin CC3 Testnet</div></div>
+    </div>
+  </section>
+
+  <!-- 02 -->
+  <section class="slide">
+    <div class="meta"><span class="num">02</span><span class="pillar">Product vision</span></div>
+    <h2>Detection is a solved problem. Consequence isn't.</h2>
+    <p>Every serious protocol already checks whether its price feed is stale. That check works.
+    When the feed goes quiet, a lending protocol correctly <strong>halts liquidations</strong>.</p>
+    <p>And that is precisely when it starts losing money. Positions drift underwater, bad debt
+    accrues, and the protocol absorbs it. <strong>Detection converted one loss into another. It
+    prevented nothing.</strong></p>
+    <div class="quote">
+      <p>Monitoring tells you that something went wrong.<br>
+      Attestable lets someone <em>carry the financial consequence</em> of it.</p>
+    </div>
+    <p class="note">Today this risk sits uninsured and unpriced on the balance sheet of every
+    protocol that depends on an oracle. Risk committees cannot put a number on it, so they
+    over-collateralise instead — which is expensive, and still doesn't pay out when it happens.</p>
+  </section>
+
+  <!-- 03 -->
+  <section class="slide">
+    <div class="meta"><span class="num">03</span><span class="pillar plain">What it is</span></div>
+    <h2>A policy with exactly two parties — and the provider isn't one of them.</h2>
+    <div class="cols">
+      <div class="col">
+        <h4>The buyer</h4>
+        <p>A protocol exposed to a feed it doesn't control. Pays a premium up front. Converts an
+        unbounded tail risk into a budgetable monthly cost.</p>
+      </div>
+      <div class="col">
+        <h4>The underwriter</h4>
+        <p>Posts collateral, keeps the premium if the feed behaves. Earns yield that is
+        uncorrelated with market direction.</p>
+      </div>
+      <div class="col">
+        <h4>The subject</h4>
+        <p>Chainlink. Signs nothing, stakes nothing, receives nothing, and need not know we exist
+        — exactly like weather in a rainfall derivative.</p>
+      </div>
+    </div>
+    <div class="flag"><b>Why that matters commercially:</b> there is no business-development
+    bottleneck. We never need a provider's permission, signature, or integration to launch a
+    market on their infrastructure. That is the difference between a product and a partnership deal.</div>
+  </section>
+
+  <!-- 04 -->
+  <section class="slide">
+    <div class="meta"><span class="num">04</span><span class="pillar">Technical alignment</span></div>
+    <p class="kicker">Not a simulation</p>
+    <h2>We insured a real outage, and the chain paid it.</h2>
+    <p>On <strong>31 August 2026</strong>, Chainlink's ETH/USD feed on Sepolia went silent for
+    <em>12 hours 53 minutes</em>. We wrote a policy over that exact window with a 90-minute
+    tolerance, proved the silence through Attestcoin, and let the contract settle itself.</p>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Outcome</th><th>Worst silence</th><th>Tolerance</th><th>Proofs</th><th>Settlement</th></tr></thead>
+        <tbody>
+          <tr><td><b>CLAIMED</b></td><td class="num">773.6 min</td><td class="num">90 min</td><td class="num">2</td>
+              <td><a class="mono" href="https://creditcoin-testnet.blockscout.com/tx/0xdf52e5adbb2ba5677225f4514981989f5730482cccc2fa11420c0ec5613f28cd">0xdf52e5ad…</a></td></tr>
+          <tr><td><b>HEALTHY</b></td><td class="num">61.6 min</td><td class="num">90 min</td><td class="num">7</td>
+              <td><a class="mono" href="https://creditcoin-testnet.blockscout.com/tx/0x801da47a335bb11898d78c5fdc49b04e8af19ba75248017c7c0ab2ab2bd253aa">0x801da47a…</a></td></tr>
+          <tr><td><b>HEALTHY</b></td><td class="num">61.6 min</td><td class="num">90 min</td><td class="num">3</td>
+              <td><a class="mono" href="https://creditcoin-testnet.blockscout.com/tx/0x2c090c1d011660dd6de59aa938958394c03bf3258a9740b59b69baa2b7ba4187">0x2c090c1d…</a></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="flag"><b>The number that proves we built against reality:</b> the feed's
+    <em>documented</em> heartbeat is 60 minutes. Its real worst gap on a perfectly healthy day is
+    <strong>61.6</strong>. A policy written from the documentation would have paid claims against
+    working infrastructure. Only measuring caught that.</div>
+  </section>
+
+  <!-- 05 -->
+  <section class="slide">
+    <div class="meta"><span class="num">05</span><span class="pillar">Technical alignment</span></div>
+    <h2>Why this can only settle on Creditcoin.</h2>
+    <p>The contract needs to answer two different questions, and Attestcoin is the only place both
+    are answerable natively — with no bridge, no relayer quorum, and no trusted messenger.</p>
+    <div class="cols">
+      <div class="col">
+        <h4>Block Prover · <span class="mono">0x0FD2</span></h4>
+        <p><strong>“Did this happen?”</strong> Merkle inclusion against the source block's
+        transaction trie, plus continuity down to a block the attestor set signed.</p>
+      </div>
+      <div class="col">
+        <h4>ChainInfo · <span class="mono">0x0FD3</span></h4>
+        <p><strong>“Could evidence have been supplied by now?”</strong> Settlement is blocked until
+        the attestation frontier passes the window's end.</p>
+      </div>
+    </div>
+    <p style="margin-top:22px">That second question is the one that makes an absence-of-evidence
+    outcome honest. Without it, a slow attestor set — <em>our own infrastructure lagging</em> —
+    would look identical to a real outage and could trigger a payout. We never claim to prove a
+    negative. The finding is narrower and defensible: <strong>insufficient valid evidence arrived
+    before an attestation-safe deadline.</strong></p>
+    <p class="note">Cryptography proves something happened; it cannot prove it was meaningful.
+    Anyone can deploy a contract that emits a fabricated price and obtain a perfectly genuine
+    proof of it. We check the emitter, the receipt status, and the event shape — and we ran that
+    exact attack against the live precompile. It was rejected.</p>
+  </section>
+
+  <!-- 06 -->
+  <section class="slide">
+    <div class="meta"><span class="num">06</span><span class="pillar">Market fit</span></div>
+    <h2>Who buys coverage.</h2>
+    <p>They share one shape: their economics break when a feed they don't own goes quiet, and no
+    amount of engineering on their side prevents it.</p>
+    <ul>
+      <li><b>Lending protocols</b> — the sharpest case. A correct staleness check makes them halt
+      liquidations, so positions drift underwater and bad debt accrues.</li>
+      <li><b>Perps and derivatives venues</b> — a stale mark price and funding rate means
+      continuous bleeding to arbitrage for as long as the silence lasts.</li>
+      <li><b>Collateralised stablecoin issuers</b> — stale collateral valuation threatens the peg,
+      which <em>is</em> the product.</li>
+      <li><b>Vaults, structured products, RWA platforms</b> — rebalancing and mark-to-market stop
+      dead when the feed stops.</li>
+    </ul>
+    <div class="flag">The buyer's real motive is not the payout. It is turning an unbounded tail
+    risk into <b>a line item</b>. For the first time a risk committee can attach a number to
+    “we depend on an oracle”.</div>
+  </section>
+
+  <!-- 07 -->
+  <section class="slide">
+    <div class="meta"><span class="num">07</span><span class="pillar">Market fit</span></div>
+    <h2>Who underwrites it.</h2>
+    <ul>
+      <li><b>DeFi funds and yield desks</b> — almost all DeFi yield is market beta.
+      Oracle-liveness premium is <em>uncorrelated with market direction</em>, which is scarce.
+      And because every update is public and timestamped, the risk is unusually modelable.</li>
+      <li><b>Market makers and volatility desks</b> — already price tail events; this is cleaner
+      data than most of what they trade.</li>
+      <li><b>The infrastructure operator itself</b> — the strongest angle we found.</li>
+    </ul>
+    <div class="quote" style="margin-top:22px">
+      <p>A newer oracle network competing with Chainlink can underwrite coverage on its own feed.
+      <em>“We pay you if we go stale”</em> is a financial commitment, not a marketing claim.</p>
+    </div>
+    <p style="margin-top:18px">That is also the cleanest answer to <strong>“why not just let the
+    provider fix it?”</strong> — underwriting is <em>how a provider proves they fixed it</em>. It
+    hands operators a procurement weapon they currently do not have.</p>
+  </section>
+
+  <!-- 08 -->
+  <section class="slide">
+    <div class="meta"><span class="num">08</span><span class="pillar">User base expansion</span></div>
+    <h2>What each policy brings to Creditcoin.</h2>
+    <p>Not a one-off transaction. A cover is an <strong>ongoing on-chain relationship</strong> for
+    its entire life.</p>
+    <div class="cols">
+      <div class="col">
+        <h4>Two funded participants</h4>
+        <p>A buyer and an underwriter, both needing CTC, who otherwise had no reason to transact
+        on Creditcoin at all.</p>
+      </div>
+      <div class="col">
+        <h4>Recurring proof traffic</h4>
+        <p>Every qualifying feed update is a separate verification transaction — continuous
+        activity for the whole window, not a single settlement.</p>
+      </div>
+      <div class="col">
+        <h4>Escrow as TVL</h4>
+        <p>Collateral and premium sit locked on-chain for the duration of every active cover.</p>
+      </div>
+    </div>
+    <p style="margin-top:24px">And the reason they come is structural, not promotional:
+    <strong>Creditcoin is the only place the contract can settle</strong>, because it is the only
+    chain that natively verifies what happened on Ethereum. The demand isn't for a token — it's
+    for a capability that exists nowhere else.</p>
+  </section>
+
+  <!-- 09 -->
+  <section class="slide">
+    <div class="meta"><span class="num">09</span><span class="pillar">Product vision</span></div>
+    <h2>Roadmap.</h2>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Horizon</th><th>What ships</th><th>Why it matters</th></tr></thead>
+        <tbody>
+          <tr><td><b>Now</b></td><td>Chainlink feed liveness on Sepolia, settled on Creditcoin</td>
+              <td>Working, deployed, with real settlements on a real outage</td></tr>
+          <tr><td><b>Next</b></td><td>One design partner</td>
+              <td>A mid-sized lending protocol already burned by oracle latency. <b>This is the real milestone — it is commercial, not technical.</b></td></tr>
+          <tr><td><b>Then</b></td><td>Multi-chain evidence in a single policy</td>
+              <td>Mainnet is already attested and the aggregator resolves; we cut it rather than ship it half-working</td></tr>
+          <tr><td><b>Then</b></td><td>Policy registry and pooled underwriting</td>
+              <td>Capital efficiency — one pool backing many covers instead of 1:1 collateral</td></tr>
+          <tr><td><b>Later</b></td><td>Beyond price feeds: bridges, sequencers, DA layers</td>
+              <td>Any infrastructure whose failure is observable on-chain is insurable the same way</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 10 -->
+  <section class="slide">
+    <div class="meta"><span class="num">10</span><span class="pillar">Team quality</span></div>
+    <h2>Emmanuel Aje Ayoola</h2>
+    <p class="lead">Solo founder and sole engineer. Nigeria.</p>
+    <p>Contracts, worker, frontend, tests, deployment and documentation — all of it. What I would
+    ask you to judge is not headcount, but the decisions:</p>
+    <ul>
+      <li><b>I attacked my own contract and published what I found.</b> Two exploits — instant
+      collateral drain via a missing wall-clock check, and retrospective purchase of coverage
+      whose outcome was already observable. Both fixed; both now regression-tested.</li>
+      <li><b>I measured instead of trusting documentation.</b> The 61.6-minute finding exists
+      because I refused to write a policy from a spec sheet.</li>
+      <li><b>I found a bug on submission day that would have made the demo a lie.</b> Our evidence
+      scanner used a fixed lookback shorter than the policy window, manufacturing a 314-minute
+      outage that never happened. I fixed the scanner and left that cover <em>unsettled</em>
+      rather than settle money on a number I knew was wrong.</li>
+      <li><b>The wrong turns are still in the commit history.</b> A history with no mistakes in it
+      looks manufactured.</li>
+    </ul>
+  </section>
+
+  <!-- 11 -->
+  <section class="slide">
+    <div class="meta"><span class="num">11</span><span class="pillar">Team quality</span></div>
+    <h2>If we win the $10,000.</h2>
+    <p>CertiK audit credits and Skynet Boost come with the placement, so none of this duplicates
+    security audit spend. Every line below buys the one thing this project actually lacks:
+    <strong>a first real counterparty</strong>.</p>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Allocation</th><th>Amount</th><th>What it unblocks</th></tr></thead>
+        <tbody>
+          <tr><td><b>Underwriting seed capital</b></td><td class="num">$4,000</td>
+              <td>Capitalise the first live covers so a design partner can buy protection that genuinely pays. Without capital on the supply side there is no market to join.</td></tr>
+          <tr><td><b>Founder runway</b></td><td class="num">$3,000</td>
+              <td>Three months to ship multi-chain evidence and the policy registry.</td></tr>
+          <tr><td><b>Archive infrastructure &amp; mainnet</b></td><td class="num">$1,500</td>
+              <td>A year of archive RPC access plus mainnet deployment and monitoring. Archive access is the literal reason multi-chain was cut.</td></tr>
+          <tr><td><b>Regulatory opinion</b></td><td class="num">$1,500</td>
+              <td>A preliminary view on where a parametric on-chain instrument can be offered, and to whom. Unanswered, this blocks every serious buyer.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 12 -->
+  <section class="slide">
+    <div class="meta"><span class="num">12</span><span class="pillar plain">Honesty</span></div>
+    <h2>What we do not claim.</h2>
+    <div class="cols">
+      <div class="col">
+        <h4>No signed customers</h4>
+        <p>The risk is measured and the loss mechanism is concrete, but nobody is hedging
+        oracle-staleness today. Every party in this deck is prospective.</p>
+      </div>
+      <div class="col">
+        <h4>We don't judge correctness</h4>
+        <p>We cover silence, never inaccuracy. Judging whether a price was <em>right</em> would
+        require an oracle — the dependency we exist to make survivable.</p>
+      </div>
+      <div class="col">
+        <h4>Trust isn't eliminated</h4>
+        <p>It is relocated. Trust remains in Attestcoin's attestor set and in the feed's honesty
+        about itself. This is a working prototype, not a regulated insurance product.</p>
+      </div>
+    </div>
+    <p class="note">We state this plainly because the alternative is worse. A judge who catches
+    you overclaiming discounts everything else you said — and the limits here are narrow enough
+    that naming them costs us nothing.</p>
+  </section>
+
+  <!-- 13 -->
+  <section class="slide">
+    <div class="meta"><span class="num">13</span><span class="pillar plain">Prepared answers</span></div>
+    <h2>The three questions we expect.</h2>
+    <h3 style="margin-top:26px">“Why is the data on Ethereum at all?”</h3>
+    <div class="quote"><p>Because it already is. Chainlink's node operators publish it there for
+    their own reasons — we didn't create it, can't influence it, can't fake it. That's exactly
+    what makes it credible evidence.</p></div>
+    <h3 style="margin-top:26px">“Is there really a market for this?”</h3>
+    <div class="quote"><p>Honestly — unproven. The risk is measured and the loss mechanism is
+    concrete, but nobody is hedging oracle-staleness today and we have no signed customers. Our
+    next milestone isn't technical, it's one design partner: a lending protocol that's already
+    been burned by oracle latency and remembers it.</p></div>
+    <h3 style="margin-top:26px">“What's left to build?”</h3>
+    <div class="quote"><p>Multi-chain evidence in one policy. Mainnet is already attested and we
+    confirmed the aggregator resolves — we couldn't get the archive access to finish it, so we cut
+    it rather than ship something half-working.</p></div>
+  </section>
+
+  <!-- 14 -->
+  <section class="slide">
+    <div class="meta"><span class="num">14</span><span class="pillar plain">Verify everything</span></div>
+    <h2>Nothing here needs to be taken on trust.</h2>
+    <div class="scroll">
+      <table>
+        <tbody>
+          <tr><td><b>Live application</b></td><td><a href="https://nailer.github.io/attestable/">nailer.github.io/attestable</a></td></tr>
+          <tr><td><b>Source</b></td><td><a href="https://github.com/Nailer/attestable">github.com/Nailer/attestable</a></td></tr>
+          <tr><td><b>AttestableCover</b></td><td><a class="mono" href="https://creditcoin-testnet.blockscout.com/address/0xB560596EcCfe690396E8BEC72EC0FaFFb6D87f89">0xB560596EcCfe690396E8BEC72EC0FaFFb6D87f89</a></td></tr>
+          <tr><td><b>AttestableASC</b></td><td><a class="mono" href="https://creditcoin-testnet.blockscout.com/address/0xDd1618a762cE8b4C9Bc849Bb6FF260519B221775">0xDd1618a762cE8b4C9Bc849Bb6FF260519B221775</a></td></tr>
+          <tr><td><b>Monitored feed</b></td><td><a class="mono" href="https://sepolia.etherscan.io/address/0x719E22E3D4b690E5d96cCb40619180B5427F14AE">Chainlink ETH/USD aggregator, Sepolia</a></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="margin-top:26px;font-size:19px;color:var(--on-slide)">Every figure in this deck was
+    read from a public chain. The application itself computes no outcome — it displays what the
+    contract already decided.</p>
+  </section>
+
+</div>

@@ -1,0 +1,123 @@
+<title>DoraHacks Submission Answers</title>
+<style>
+  :root{
+    --paper:#fcfcfd; --ink:#12171e; --ink-2:#4c5765; --ink-3:#7d8896;
+    --rule:#e4e8ee; --box:#f4f6f9; --accent:#1f5fb8;
+    --sans:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --paper:#0d1116; --ink:#e8edf4; --ink-2:#b2bcc9; --ink-3:#7f8a99;
+      --rule:#232c37; --box:#161d26; --accent:#6aa6f0;
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#0d1116; --ink:#e8edf4; --ink-2:#b2bcc9; --ink-3:#7f8a99;
+    --rule:#232c37; --box:#161d26; --accent:#6aa6f0;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);
+       font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased}
+  .page{max-width:720px;margin:0 auto;padding:52px 22px 110px}
+  h1{font-size:30px;font-weight:700;letter-spacing:-.02em;margin:0 0 8px}
+  .sub{color:var(--ink-3);font-size:15px;margin:0 0 12px}
+  .field{margin-top:44px;padding-top:26px;border-top:1px solid var(--rule)}
+  .label{display:flex;align-items:baseline;gap:10px;margin-bottom:6px}
+  .n{font-family:var(--mono);font-size:12px;color:var(--accent);font-weight:600}
+  .label h2{margin:0;font-size:19px;font-weight:660;letter-spacing:-.012em}
+  .hint{font-size:13.5px;color:var(--ink-3);margin:0 0 16px}
+  pre{background:var(--box);border:1px solid var(--rule);border-radius:4px;
+      padding:18px 20px;overflow-x:auto;margin:0;
+      font-family:var(--mono);font-size:13.5px;line-height:1.62;color:var(--ink);
+      white-space:pre-wrap;word-wrap:break-word}
+  .tip{margin-top:12px;font-size:13.5px;color:var(--ink-3)}
+  .tip b{color:var(--ink-2);font-weight:640}
+  a{color:var(--accent)}
+</style>
+
+<div class="page">
+  <h1>Submission answers</h1>
+  <p class="sub">Copy each block straight into the DoraHacks form. Plain language, short, nothing
+  that can't be checked.</p>
+
+  <div class="field">
+    <div class="label"><span class="n">01</span><h2>Vision — the problem it solves</h2></div>
+    <p class="hint">Opens on the gap everyone recognises but nobody has priced.</p>
+<pre>When the price feed a protocol depends on goes quiet, everyone notices. Nobody pays.
+
+Protocols can already detect when their price data goes stale. That part works. The problem is what happens next — the protocol freezes, positions drift underwater, and bad debt piles up. Detection doesn't prevent the loss. It just narrates it.
+
+And there is nobody to claim from. The company running the feed never signed anything, never promised uptime, and owes nothing when it stops. So the risk sits on the balance sheet with no price on it and no way to hedge it.
+
+Attestable gives that risk somewhere to go. Someone agrees up front to carry it, and gets paid for doing so. If the feed goes quiet for longer than the agreed limit, the payout happens by itself — no claim form, no negotiation, nobody deciding whether you deserve it.</pre>
+  </div>
+
+  <div class="field">
+    <div class="label"><span class="n">02</span><h2>Describe your build</h2></div>
+    <p class="hint">Markdown. The middle section is the one that wins it — it proves this isn't a mock-up.</p>
+<pre>## What it does
+
+A protocol buys cover on a price feed it depends on. Someone else puts up the money to back it. If the feed keeps working, the backer keeps the premium. If it goes quiet for too long, the protocol gets paid — automatically.
+
+## What we built
+
+- **Two separate contracts.** One checks evidence and never touches money. The other holds the money and never checks evidence. Split that way, a mistake in one cannot drain the other.
+- **A web app.** Write a policy, buy one, submit evidence, settle it. No command line and no scripts — everything runs in the browser.
+- **An evidence pipeline.** It finds real price updates on Ethereum, gets each one proven, and submits it to Creditcoin for checking.
+
+## This is not a simulation
+
+On 31 August 2026, the Chainlink ETH/USD feed on Sepolia went silent for 773 minutes — just under 13 hours. We wrote a policy over that exact window, proved the silence, and let the contract settle itself. It paid the buyer 200 CTC, and no human approved it.
+
+We also settled covers where the feed behaved normally and the backer kept everything. Both outcomes are on-chain and anyone can open them.
+
+## Tested against ourselves
+
+51 tests pass, including 12 written specifically to attack our own contract. Two real weaknesses were found that way and fixed: one allowed a policy to be settled before its window had ended, the other allowed someone to buy cover on an outage that had already begun.
+
+## The number that mattered most
+
+The feed's documentation says it updates every 60 minutes. Measured against real history, its worst gap on a perfectly healthy day is 61.6 minutes. A policy written from the documentation would have paid out against infrastructure that was working fine. We only found that because we measured instead of trusting the spec.
+
+**Try it:** https://nailer.github.io/attestable/
+**Code:** https://github.com/Nailer/attestable</pre>
+  </div>
+
+  <div class="field">
+    <div class="label"><span class="n">03</span><h2>Track</h2></div>
+    <p class="hint">DeFi. If the form allows a sentence, add the second line.</p>
+<pre>DeFi
+
+It is a financial product in the plainest sense: two parties, a premium, collateral, and a payout. It takes a risk that DeFi protocols already carry silently and turns it into something that can be priced, sold, and hedged.</pre>
+  </div>
+
+  <div class="field">
+    <div class="label"><span class="n">04</span><h2>Project description</h2></div>
+    <p class="hint">The one they'll quote. Deliberately free of jargon.</p>
+<pre>Attestable is insurance for the infrastructure a protocol depends on but doesn't control.
+
+You pick a price feed and a limit — say, it must never go quiet for more than 90 minutes. Someone else puts up collateral and takes the other side of that bet. You pay them a premium. If the feed behaves, they keep it. If it goes quiet for longer than the limit, you get the collateral.
+
+Nobody approves the payout. There is no claims process, no paperwork, and no adjuster deciding whether your loss was real. The contract looks at proof of what actually happened on Ethereum and pays accordingly.
+
+The feed provider is not part of the deal. They sign nothing, stake nothing, and don't need to know this exists — in the same way a rainfall insurance policy doesn't need the weather's permission.</pre>
+  </div>
+
+  <div class="field">
+    <div class="label"><span class="n">05</span><h2>USC integration summary</h2></div>
+    <p class="hint">Judges score depth here. The point to land: two surfaces, two different jobs — not a checkbox.</p>
+<pre>Attestable can only exist on Creditcoin, because the entire product rests on one thing: a contract being able to check what happened on another chain without trusting anyone to tell it.
+
+We use USC for two genuinely different jobs.
+
+**Proving an event happened.** When Chainlink publishes a price on Ethereum, we build a proof and hand it to the Block Prover precompile, which confirms that transaction really was in that Ethereum block. We then use the USC decoder to read the transaction receipt and check three more things ourselves: that the transaction actually succeeded, that the price came from the exact contract our policy names, and that only one matching event is present. This matters more than it sounds — anyone can publish a fake price from their own contract and get a perfectly genuine proof of it. A proof tells you something happened. It does not tell you it was meaningful. We tested that attack against the live network and our contract rejected it.
+
+**Knowing when it is safe to decide.** A payout here depends partly on evidence *not* arriving — and that is dangerous, because if our own proof system were running behind, it would look exactly like a real outage. So before settling anything, the contract asks the ChainInfo precompile whether Creditcoin has caught up past the end of the policy window. If it hasn't, settlement is blocked. We never claim to have proven a negative. We only claim that valid evidence did not arrive in time, at a point when it genuinely could have.
+
+We also use the USC SDK to build the proofs themselves, running it in the browser so a user needs nothing installed.</pre>
+    <p class="tip"><b>If the field is short,</b> keep the opening line and the two bold headings —
+    that alone shows both precompiles doing different work.</p>
+  </div>
+
+</div>
