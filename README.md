@@ -410,7 +410,7 @@ Tested against the **live** precompile on Creditcoin, not in simulation. Five at
 | Alter the proven transaction payload | precompile: `Merkle proof validation failed` |
 | **Valid proof, wrong aggregator** | `WrongEmitter` |
 
-Plus 48 local tests covering both settlement branches, the real 12.9-hour outage replayed, the measured 61.4-minute worst case correctly *not* claiming, per-cover replay, cross-cover evidence reuse, ordering, window bounds, the frontier gate, double settlement, and a 256-run fuzz on escrow conservation.
+Plus 51 local tests covering both settlement branches, the real 12.9-hour outage replayed, the measured worst case correctly *not* claiming, per-cover replay, cross-cover evidence reuse, ordering, window bounds, the frontier gate, double settlement, and a 256-run fuzz on escrow conservation.
 
 ### A design decision worth calling out
 
@@ -478,7 +478,7 @@ npx tsx spike/check-chainlink.ts    # resolve the aggregator, confirm the event
 
 ```bash
 forge build
-forge test                          # 30 tests
+forge test                          # 51 tests
 ```
 
 ### Create and fill a cover
@@ -498,6 +498,7 @@ forge test -vv
 
 | Suite | Covers |
 |---|---|
+| `Adversarial.t.sol` | Twelve numbered security properties, plus two exploits found by walking the buyer's and underwriter's journeys: settling before a window closes, and buying coverage whose outcome is already observable |
 | `AttestableASC.t.sol` | Decoding **real chain bytes**, wrong emitter, absent signature, wrong chain key, failed verification, inactive cover, and full ASC→Cover integration |
 | `AttestableCover.t.sol` | Escrow, both settlement branches, the real outage replayed, the measured worst case, replay, ordering, window bounds, frontier gate, fuzz conservation |
 
