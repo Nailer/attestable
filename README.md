@@ -73,34 +73,37 @@ Because neither counterparty can influence whether the feed publishes, the risk 
 
 ## Live on Creditcoin testnet
 
-Everything below is real and independently verifiable.
+Everything below is real, on a public chain, and independently verifiable.
+
+**Try it yourself: https://nailer.github.io/attestable/**
+
+### Current deployment
 
 | Contract | Address |
 |---|---|
-| `AttestableCover` | [`0x87553eA864e4cd16357Fa3D0D27F9F4e831aDc91`](https://creditcoin-testnet.blockscout.com/address/0x87553eA864e4cd16357Fa3D0D27F9F4e831aDc91) |
-| `AttestableASC` | [`0x3b531F270eec0F15816577FC0E556eAFf00B9Fe2`](https://creditcoin-testnet.blockscout.com/address/0x3b531F270eec0F15816577FC0E556eAFf00B9Fe2) |
-| `EvmV1Decoder` (library) | [`0x843e8432dfE39e2010511796e7e37fC44EAb72d3`](https://creditcoin-testnet.blockscout.com/address/0x843e8432dfE39e2010511796e7e37fC44EAb72d3) |
-| `SpikeVerifier` (feasibility gate) | [`0x38817EdCa801DeeC79Dbe586Af26a1D04D180248`](https://creditcoin-testnet.blockscout.com/address/0x38817EdCa801DeeC79Dbe586Af26a1D04D180248) |
+| `AttestableCover` | [`0xB560596EcCfe690396E8BEC72EC0FaFFb6D87f89`](https://creditcoin-testnet.blockscout.com/address/0xB560596EcCfe690396E8BEC72EC0FaFFb6D87f89) |
+| `AttestableASC` | [`0xDd1618a762cE8b4C9Bc849Bb6FF260519B221775`](https://creditcoin-testnet.blockscout.com/address/0xDd1618a762cE8b4C9Bc849Bb6FF260519B221775) |
+| `EvmV1Decoder` (linked library) | [`0x843e8432dfE39e2010511796e7e37fC44EAb72d3`](https://creditcoin-testnet.blockscout.com/address/0x843e8432dfE39e2010511796e7e37fC44EAb72d3) |
 
-**The proof that the pipeline works end to end:**
+### Settled covers — both outcomes, on real Chainlink evidence
 
-[`0x7c738788da8d94543739b7a8797f43b7c9394ad663d51693e2bba5cbd713d4a1`](https://creditcoin-testnet.blockscout.com/tx/0x7c738788da8d94543739b7a8797f43b7c9394ad663d51693e2bba5cbd713d4a1)
+These settled on the **previous deployment**, which remains live and inspectable. They are kept as the record because a later security fix — coverage can no longer be bought once its window has opened — makes it impossible to re-create a claim over a historical outage. That was the correct trade, and the evidence stands where it was made.
 
-That transaction took a genuine Chainlink price publication from Ethereum Sepolia, verified it through Attestcoin's Block Prover precompile inside a Creditcoin contract, and changed on-chain state as a result. Gas used: 363,468. Decoded payload: **$2390.75**, round 35735, timestamped 2026-09-02 17:49 UTC.
+| Outcome | Worst silence proven | Tolerance | Proofs | Settlement |
+|---|---|---|---|---|
+| **HEALTHY** | 61.6 min | 90 min | 7 | [`0x801da47a…`](https://creditcoin-testnet.blockscout.com/tx/0x801da47a335bb11898d78c5fdc49b04e8af19ba75248017c7c0ab2ab2bd253aa) |
+| **CLAIMED** | **773.6 min** — the real 2026-08-31 outage | 90 min | 2 | [`0xdf52e5ad…`](https://creditcoin-testnet.blockscout.com/tx/0xdf52e5adbb2ba5677225f4514981989f5730482cccc2fa11420c0ec5613f28cd) |
+| **HEALTHY** | 61.6 min | 90 min | 3 | [`0x2c090c1d…`](https://creditcoin-testnet.blockscout.com/tx/0x2c090c1d011660dd6de59aa938958394c03bf3258a9740b59b69baa2b7ba4187) |
 
-**Two covers have settled, with opposite outcomes, on the same contract and the same pipeline:**
+Those covers are on [`0x87553eA864e4cd16357Fa3D0D27F9F4e831aDc91`](https://creditcoin-testnet.blockscout.com/address/0x87553eA864e4cd16357Fa3D0D27F9F4e831aDc91), with verification by [`0xC8E0472a5aA4bF6e6120c65682Cb19a65cb2Ffe8`](https://creditcoin-testnet.blockscout.com/address/0xC8E0472a5aA4bF6e6120c65682Cb19a65cb2Ffe8).
 
-| | Cover #1 — HEALTHY | Cover #2 — CLAIMED |
-|---|---|---|
-| Window | 2026-09-11, 5.9 h | 2026-08-31, the real outage |
-| Worst silence proven | **61.6 min** | **773.6 min** |
-| Tolerance | 90 min | 90 min |
-| Verified proofs submitted | 7 | 2 |
-| Buyer receives | — | **200 CTC** |
-| Underwriter receives | **212 CTC** | 12 CTC |
-| Settlement | [`0x801da47a…`](https://creditcoin-testnet.blockscout.com/tx/0x801da47a335bb11898d78c5fdc49b04e8af19ba75248017c7c0ab2ab2bd253aa) | [`0xdf52e5ad…`](https://creditcoin-testnet.blockscout.com/tx/0xdf52e5adbb2ba5677225f4514981989f5730482cccc2fa11420c0ec5613f28cd) |
+**The number that matters most is 61.6.** That is the worst gap a *healthy* feed produced. Its published heartbeat is 60 minutes. A policy written from the specification rather than from measurement would have paid claims against infrastructure that was working perfectly.
 
-Note the healthy cover's worst gap: **61.6 minutes**. The feed's nominal heartbeat is 60. A policy written to the specification would have paid a claim against a perfectly functioning feed — which is why the tolerance is 90.
+### The feasibility proof
+
+[`0x7c738788…`](https://creditcoin-testnet.blockscout.com/tx/0x7c738788da8d94543739b7a8797f43b7c9394ad663d51693e2bba5cbd713d4a1) — the first transaction in which a genuine Chainlink price publication from Ethereum Sepolia was verified through Attestcoin's Block Prover inside a Creditcoin contract and changed on-chain state. Gas 363,468. Decoded payload: **$2390.75**, round 35735.
+
+Contract: [`SpikeVerifier`](https://creditcoin-testnet.blockscout.com/address/0x38817EdCa801DeeC79Dbe586Af26a1D04D180248). Five attacks were run against it on the live network — replay, wrong chain, tampered Merkle root, tampered payload, and a genuine proof of a fake feed. All five were rejected.
 
 ---
 
