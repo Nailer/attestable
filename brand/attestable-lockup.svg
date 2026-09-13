@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 340 80" role="img" aria-label="Attestable">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0.4" y2="1">
+      <stop offset="0" stop-color="#1b2740"/><stop offset="1" stop-color="#0d1421"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(8,8)">
+    <rect width="64" height="64" rx="15" fill="url(#g)"/>
+    <path d="M17 49 L32 16 L47 49" fill="none" stroke="#ffffff" stroke-width="6.6"
+          stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M20.5 38.5 H43.5" fill="none" stroke="#4a9eff" stroke-width="6.2" stroke-linecap="round"/>
+  </g>
+  <text x="88" y="52" font-family="Helvetica Neue, Helvetica, Arial, sans-serif"
+        font-size="38" font-weight="600" letter-spacing="-0.9" fill="#0d1421">Attestable</text>
+</svg>

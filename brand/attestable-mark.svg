@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Attestable">
+  <!--
+    Monogram A on its own ground. The two legs are the two chains; the brighter
+    crossbar is the proof that bridges them into a single letter.
+
+    Self-contained on purpose — it carries its own background, so it reads the
+    same in a light tab bar, a dark one, and on any surface it is placed on.
+  -->
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0.4" y2="1">
+      <stop offset="0" stop-color="#1b2740"/>
+      <stop offset="1" stop-color="#0d1421"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="64" height="64" rx="15" fill="url(#g)"/>
+
+  <path d="M17 49 L32 16 L47 49" fill="none" stroke="#ffffff" stroke-width="6.6"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M20.5 38.5 H43.5" fill="none" stroke="#4a9eff" stroke-width="6.2"
+        stroke-linecap="round"/>
+</svg>

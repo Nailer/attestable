@@ -11,7 +11,7 @@ const CI=['function is_height_attested(uint64,uint64) view returns (bool)','func
   const [frontier]=await ci.get_latest_attestation_height_and_hash(1);
   console.log('attestation frontier (chainKey 1):', frontier.toString());
   console.log('now:', now, new Date(now*1000).toISOString());
-  for (const id of [1,4]) {
+  for (const id of [4,6]) {
     const v=await c.getCover(id); const p=v.policy;
     const proj=await c.projectedMaxGap(id);
     const attested=await ci.is_height_attested(1n, p.windowEndBlock);
