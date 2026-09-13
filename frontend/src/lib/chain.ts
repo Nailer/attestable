@@ -82,17 +82,37 @@ export interface Settlement {
  * the agreed figures survive — and it is also the honest source, since it is
  * what both parties actually signed up to.
  */
+/**
+ * Agreed terms for EVERY cover, fetched in a single log query.
+ *
+ * These were previously read one cover at a time. Each query scans the full
+ * range since deployment, so the cost was paid once per cover and the page sat
+ * on a spinner for ~18 seconds with six covers — long enough to look broken.
+ * One query answers all of them, and the result is immutable once written, so
+ * it is cached for the life of the page.
+ */
+let termsCache: Promise<Map<number, { collateral: bigint; premium: bigint }>> | null = null;
+
+function allOriginalTerms() {
+  if (!termsCache) {
+    termsCache = coverContract
+      .queryFilter(coverContract.filters.CoverCreated(), CONFIG.deployBlock, 'latest')
+      .then((logs) => {
+        const m = new Map<number, { collateral: bigint; premium: bigint }>();
+        for (const l of logs as ethers.EventLog[]) {
+          m.set(Number(l.args[0]), { collateral: l.args[2] as bigint, premium: l.args[3] as bigint });
+        }
+        return m;
+      })
+      .catch(() => new Map());
+  }
+  return termsCache;
+}
+
 export async function getOriginalTerms(
   coverId: number
 ): Promise<{ collateral: bigint; premium: bigint } | null> {
-  const logs = await coverContract.queryFilter(
-    coverContract.filters.CoverCreated(coverId),
-    CONFIG.deployBlock,
-    'latest'
-  );
-  if (logs.length === 0) return null;
-  const ev = logs[0] as ethers.EventLog;
-  return { collateral: ev.args[2] as bigint, premium: ev.args[3] as bigint };
+  return (await allOriginalTerms()).get(coverId) ?? null;
 }
 
 export async function getCoverCount(): Promise<number> {

@@ -92,7 +92,14 @@ export async function fillCover(deps: WorkerDeps, coverId: number, opts: { dryRu
   // Locate every qualifying event inside the window. Block range is derived
   // from the window's own end block, walking back generously.
   const endBlock = Number(policy.windowEndBlock);
-  const fromBlock = endBlock - 6000;
+  // Derive the scan range from the POLICY, never a fixed lookback.
+  //
+  // A hardcoded `endBlock - 6000` covers only ~20 hours of Ethereum. On a
+  // 24-hour cover it silently missed the first 1,250 blocks — and because a
+  // missing update widens the apparent gap, that produced a 314-minute "outage"
+  // that never happened. A scanning blind spot must never be able to
+  // manufacture a claim.
+  const fromBlock = Number(policy.windowStartBlock) || endBlock - 6000;
   let logs = await getLogsChunked(source, { address: aggregator, topics: [ANSWER_UPDATED] }, fromBlock, endBlock);
 
   // A wide scan returning nothing usually means the window is older than the

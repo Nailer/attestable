@@ -61,7 +61,10 @@ export async function findCandidates(
 ): Promise<Candidate[]> {
   const provider = new ethers.JsonRpcProvider(sepoliaEndpoint());
   const end = policy.windowEndBlock;
-  const start = Math.max(0, end - 6000);
+  // Range comes from the policy itself. A fixed lookback that is shorter than
+  // the coverage window leaves a blind spot at the start, and since missing
+  // evidence widens the apparent gap, the blind spot would fabricate a claim.
+  const start = policy.windowStartBlock > 0 ? policy.windowStartBlock : Math.max(0, end - 6000);
 
   let chunk = 2000;
   const logs: ethers.Log[] = [];
