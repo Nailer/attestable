@@ -1,0 +1,180 @@
+<title>One-Take Demo Script</title>
+<style>
+  :root{
+    --bg:#fff; --fg:#111; --dim:#666; --line:#ddd; --say:#f5f7fa; --hot:#8a4a00; --hotbg:#fdf4e8;
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --bg:#0e1216; --fg:#e8ecf2; --dim:#8b96a4; --line:#252d38; --say:#171e27; --hot:#e0a765; --hotbg:#261e12;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0e1216; --fg:#e8ecf2; --dim:#8b96a4; --line:#252d38; --say:#171e27; --hot:#e0a765; --hotbg:#261e12;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);
+       font:16px/1.6 system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}
+  .page{max-width:660px;margin:0 auto;padding:40px 20px 90px}
+  h1{font-size:26px;margin:0 0 6px}
+  .sub{color:var(--dim);margin:0 0 30px;font-size:15px}
+  h2{font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);
+     margin:40px 0 14px;padding-bottom:6px;border-bottom:1px solid var(--line)}
+  .step{margin:26px 0 0}
+  .when{font-size:13px;color:var(--dim);font-family:ui-monospace,Menlo,monospace;margin-bottom:6px}
+  .act{font-weight:640;margin:0 0 8px}
+  .say{background:var(--say);padding:14px 16px;border-radius:4px;margin:0 0 8px;font-size:17px}
+  .say p{margin:0}
+  .say p+p{margin-top:10px}
+  .hold{background:var(--hotbg);color:var(--hot);padding:11px 14px;border-radius:4px;
+        font-size:14.5px;margin:8px 0 0}
+  ul{margin:8px 0 0;padding-left:20px}
+  li{margin:5px 0}
+  .note{color:var(--dim);font-size:14.5px;margin-top:8px}
+  code{font-family:ui-monospace,Menlo,monospace;font-size:.9em;background:var(--line);padding:1px 5px;border-radius:3px}
+  a{color:inherit}
+</style>
+
+<div class="page">
+
+<h1>One-take script</h1>
+<p class="sub">About 3 minutes. Record start to finish, no stopping. Grey boxes are what you say.
+Everything else is what you do.</p>
+
+<h2>Do this before you hit record</h2>
+<ul>
+  <li>Open <b>nailer.github.io/attestable</b>. Wait for it to finish loading.</li>
+  <li>Connect MetaMask. Make sure it says Creditcoin CC3 Testnet.</li>
+  <li>Settings → Timestamps <b>UTC</b>, Auto-refresh <b>Off</b>. Then go back to Coverage.</li>
+  <li>Open a second tab: <a href="https://creditcoin-testnet.blockscout.com/tx/0xdf52e5adbb2ba5677225f4514981989f5730482cccc2fa11420c0ec5613f28cd?tab=internal">this Blockscout page</a>. Leave it on <b>Internal txns</b>.</li>
+  <li>Come back to tab 1. Click <b>cover #6</b> so it's already open.</li>
+  <li>Unlock MetaMask now so it doesn't ask for your password on camera.</li>
+</ul>
+<p class="note">Start recording with cover #6 on screen.</p>
+
+<h2>The take</h2>
+
+<div class="step">
+  <div class="when">0:00</div>
+  <p class="act">Just talk. Don't move the mouse yet.</p>
+  <div class="say">
+    <p>This is Attestable. It's insurance for the price feeds that apps depend on.</p>
+    <p>If you run a lending app, you need to know what ETH is worth. You get that from a price
+    feed. If the feed goes quiet, your app can't work properly and you start losing money. Right
+    now nobody pays you for that. You just take the loss.</p>
+    <p>Attestable lets someone else carry that risk, and you pay them for it.</p>
+  </div>
+</div>
+
+<div class="step">
+  <div class="when">0:30</div>
+  <p class="act">Point at the cover on screen. Move slowly.</p>
+  <div class="say">
+    <p>Here's a real one. Someone put up 200 CTC to back it. The buyer paid 12 CTC. The deal is
+    simple — this feed must not go quiet for more than 90 minutes.</p>
+    <p>Now look at this number. Right now the contract has no proof the feed was alive at any
+    point in this window. So it assumes the worst. It treats the whole 80 minutes as one long
+    silence.</p>
+  </div>
+  <p class="note">Rest the cursor on <b>“80.0 min observed / 90.0 min allowed”</b>.</p>
+</div>
+
+<div class="step">
+  <div class="when">0:55</div>
+  <p class="act">Scroll down. Click <b>Fetch and submit evidence</b>. Approve in MetaMask.</p>
+  <div class="say">
+    <p>So let me give it proof. This goes to Ethereum, finds a real price update inside that
+    window, gets a proof of it, and sends that proof over to Creditcoin.</p>
+  </div>
+  <div class="hold"><b>It will take about 30 seconds.</b> Keep talking — don't sit in silence:
+    <div class="say" style="margin-top:10px">
+      <p>What's happening now is the part that matters. The proof shows this exact price update
+      really was in that Ethereum block. Creditcoin checks that for itself. It doesn't trust me,
+      and it doesn't trust some server I'm running. It checks the maths.</p>
+      <p>And I didn't put that price there. Chainlink publishes it for their own reasons. They
+      don't know this project exists. That's exactly what makes it worth using as evidence.</p>
+    </div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="when">1:30</div>
+  <p class="act">Scroll back up. The number has changed. Point at it.</p>
+  <div class="say">
+    <p>There it is. The worst gap just dropped from 80 minutes to 41, because now we can show the
+    feed was alive in the middle of the window.</p>
+  </div>
+</div>
+
+<div class="step">
+  <div class="when">1:45</div>
+  <p class="act">Click <b>Settle this cover</b>. Approve in MetaMask.</p>
+  <div class="say">
+    <p>Now I settle it.</p>
+  </div>
+  <div class="hold"><b>Another 30 seconds.</b> Keep talking:
+    <div class="say" style="margin-top:10px">
+      <p>Nobody approves this. There's no claim form, no waiting period, and no person deciding
+      whether I deserve it. The contract looks at the proof it has and pays whoever the terms say
+      should be paid.</p>
+    </div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="when">2:15</div>
+  <p class="act">Badge flips to <b>HEALTHY</b>. Stop moving the mouse for a second.</p>
+  <div class="say">
+    <p>Healthy. The gap stayed under 90 minutes, so the person who backed it keeps their
+    collateral and keeps the premium. They got paid for taking a risk that didn't happen.</p>
+  </div>
+</div>
+
+<div class="step">
+  <div class="when">2:30</div>
+  <p class="act">Switch to the Blockscout tab.</p>
+  <div class="say">
+    <p>That one ended well. Here's one that didn't.</p>
+    <p>On the 31st of August this same feed went quiet for nearly 13 hours. That's real — I didn't
+    invent it to make a demo.</p>
+    <p>This is that policy settling. 200 CTC went to the buyer. 12 CTC stayed with the person who
+    backed it, because they still earned their premium. And this line at the top is the contract
+    checking with Creditcoin that the outage could even be proven, before it agreed to pay
+    anything.</p>
+  </div>
+  <p class="note">Walk down the three rows as you say them: the ChainInfo call, 200 CTC, 12 CTC.</p>
+</div>
+
+<div class="step">
+  <div class="when">2:55</div>
+  <p class="act">Stop. Don't click anything else.</p>
+  <div class="say">
+    <p>That's it. A real feed, a real outage, real money moving, and no person in the middle.
+    It's live right now and everything's linked below.</p>
+  </div>
+</div>
+
+<h2>If something goes wrong mid-take</h2>
+<p>Don't stop recording. Say this and keep going:</p>
+<div class="say">
+  <p>That didn't go through — let me use one that's already closed.</p>
+</div>
+<p class="note">Then click <b>cover #4</b> and settle that instead. It's verified to work and also
+settles HEALTHY. It has no evidence, so add: <i>“a 20-minute window can't contain a 90-minute
+silence, so the contract can prove this one is fine from the window alone.”</i></p>
+
+<h2>Two rules</h2>
+<ul>
+  <li><b>Don't open cover #1.</b> Its number is wrong — a bug in our own scanner that we found and
+  fixed. Nothing on screen should show it.</li>
+  <li><b>Don't leave the Blockscout Details tab open.</b> It shows <code>Value: 0 CTC</code> and
+  makes it look like no money moved. The money is under <b>Internal txns</b>.</li>
+</ul>
+
+<h2>After recording</h2>
+<ul>
+  <li>Upload to YouTube. Unlisted is fine.</li>
+  <li>Put the link at the very top of the repo README.</li>
+  <li>Send it to the organisers on Discord.</li>
+</ul>
+
+</div>
