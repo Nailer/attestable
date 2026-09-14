@@ -77,6 +77,8 @@ Everything below is real, on a public chain, and independently verifiable.
 
 **Try it yourself: https://nailer.github.io/attestable/**
 
+**Full documentation: https://attestable.mintlify.app**
+
 ### Current deployment
 
 | Contract | Address |
@@ -519,12 +521,16 @@ contracts/
   spike/SpikeVerifier.sol    feasibility gate contract
 worker/
   relayer.ts                 proof courier — watch, wait, prove, submit
+  create-forward-cover.ts    the only kind the contract will sell: a future window
   create-cover.ts            underwriter and buyer fund a cover
+  create-outage-cover.ts     the historical CLAIMED record (previous deployment)
   scenarios.ts               coverage windows derived from real history
 spike/
   REPORT.md                  full investigation log, findings and mistakes
   *.ts                       reproducible verification scripts
-test/                        30 tests, real-data fixtures
+test/                        51 tests, real-data fixtures
+docs/                        pitch deck, demo scripts, submission answers
+brand/                       mark and lockup, SVG and PNG
 SPEC.md                      frozen architecture
 TASKS.md                     every build step and its verification
 ```
