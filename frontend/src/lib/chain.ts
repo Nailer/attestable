@@ -7,10 +7,47 @@ import { sepoliaEndpoint, formatTimestamp } from './settings';
 import coverAbi from './cover.abi.json';
 import ascAbi from './asc.abi.json';
 
-export const cc = new ethers.JsonRpcProvider(CONFIG.creditcoinRpc);
+// Pinning the network stops ethers issuing an eth_chainId probe alongside every
+// batch, which is a wasted round trip against an endpoint we already know.
+const CC_NETWORK = new ethers.Network('creditcoin-cc3', 102031);
+
+export const cc = new ethers.JsonRpcProvider(CONFIG.creditcoinRpc, CC_NETWORK, {
+  staticNetwork: CC_NETWORK,
+});
 /** Rebuilt per call so an endpoint change in settings takes effect immediately. */
 export const sepoliaProvider = () => new ethers.JsonRpcProvider(sepoliaEndpoint());
 export const sepolia = sepoliaProvider();
+
+/**
+ * Retry a read that failed for a transient reason.
+ *
+ * ethers packs many eth_calls into a single POST, so the whole page hangs off a
+ * handful of large requests. Public endpoints drop or throttle one occasionally
+ * -- that is normal -- but with no retry a single dropped connection surfaced as
+ * "Could not read chain state: Failed to fetch" and blanked everything, even
+ * though the very next attempt would have succeeded.
+ *
+ * Only genuinely transient failures are retried. A revert or a bad address is a
+ * real answer and must not be papered over by trying again.
+ */
+export async function withRetry<T>(fn: () => Promise<T>, attempts = 3): Promise<T> {
+  let last: unknown;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fn();
+    } catch (e: any) {
+      last = e;
+      const msg = `${e?.message ?? e} ${e?.code ?? ''}`;
+      const transient =
+        /failed to fetch|load failed|network|timeout|timed out|ETIMEDOUT|ECONNRESET|socket|502|503|504|429|too many requests|could not coalesce|SERVER_ERROR|NETWORK_ERROR/i.test(
+          msg
+        );
+      if (!transient || i === attempts - 1) throw e;
+      await new Promise((r) => setTimeout(r, 500 * 2 ** i));
+    }
+  }
+  throw last;
+}
 
 export const coverContract = new ethers.Contract(CONFIG.coverAddress, coverAbi, cc);
 export const ascContract = new ethers.Contract(CONFIG.ascAddress, ascAbi, cc);
@@ -116,15 +153,15 @@ export async function getOriginalTerms(
 }
 
 export async function getCoverCount(): Promise<number> {
-  return Number(await coverContract.nextCoverId()) - 1;
+  return withRetry(async () => Number(await coverContract.nextCoverId()) - 1);
 }
 
 export async function getCover(id: number): Promise<Cover> {
-  const [c, projected, original] = await Promise.all([
+  const [c, projected, original] = await withRetry(() => Promise.all([
     coverContract.getCover(id),
     coverContract.projectedMaxGap(id),
     getOriginalTerms(id),
-  ]);
+  ]));
   return {
     id,
     buyer: c.buyer,
@@ -241,12 +278,14 @@ export async function getProofHealth(): Promise<ProofHealth> {
   const agg = new ethers.Contract(CONFIG.aggregator, AGGREGATOR_ABI, sepoliaProvider());
 
   const sep = sepoliaProvider();
-  const [sepoliaHead, creditcoinHead, attested, escrow] = await Promise.all([
-    sep.getBlockNumber(),
-    cc.getBlockNumber(),
-    chainInfo.get_latest_attestation_height_and_hash(CONFIG.sepoliaChainKey),
-    cc.getBalance(CONFIG.coverAddress),
-  ]);
+  const [sepoliaHead, creditcoinHead, attested, escrow] = await withRetry(() =>
+    Promise.all([
+      sep.getBlockNumber(),
+      cc.getBlockNumber(),
+      chainInfo.get_latest_attestation_height_and_hash(CONFIG.sepoliaChainKey),
+      cc.getBalance(CONFIG.coverAddress),
+    ])
+  );
 
   let aggregatorLastPrice: bigint | undefined;
   let aggregatorLastUpdate: number | undefined;

@@ -59,9 +59,19 @@ export default function App() {
   useEffect(() => {
     (async () => {
       try {
-        const [cs, h] = await Promise.all([getAllCovers(), getProofHealth()]);
+        // Proof health is deliberately NOT awaited alongside the covers. It
+        // reads the public Sepolia endpoint, which is the least reliable thing
+        // the page touches, and pairing them in one Promise.all meant a single
+        // Sepolia hiccup blanked the whole page -- covers included -- even
+        // though Creditcoin had answered perfectly well.
+        getProofHealth()
+          .then(setHealth)
+          .catch(() => {
+            /* the header stats simply stay blank; the covers still render */
+          });
+
+        const cs = await getAllCovers();
         setCovers(cs);
-        setHealth(h);
         setSelected(cs.length ? cs[cs.length - 1].id : null);
 
         // Show the covers immediately. Evidence needs several log queries per
@@ -84,7 +94,12 @@ export default function App() {
           })
         );
       } catch (e: any) {
-        setErr(e?.message ?? String(e));
+        const msg = String(e?.message ?? e);
+        setErr(
+          /failed to fetch|load failed|network/i.test(msg)
+            ? 'Could not reach Creditcoin just now. This is usually a brief network blip — press Retry.'
+            : msg
+        );
         setLoading(false);
       }
     })();
@@ -152,7 +167,22 @@ export default function App() {
 
       <ConnectBar wallet={wallet} onChange={setWallet} />
 
-      {err && <div className="err">Could not read chain state: {err}</div>}
+      {err && (
+        <div className="err">
+          {err}{' '}
+          <button
+            className="btn"
+            style={{ marginLeft: 8 }}
+            onClick={() => {
+              setErr(null);
+              setLoading(true);
+              setReloadKey((k) => k + 1);
+            }}
+          >
+            Retry
+          </button>
+        </div>
+      )}
       {loading && <div className="loading">Reading live state from Creditcoin…</div>}
 
       {!loading && tab === 'covers' && (
